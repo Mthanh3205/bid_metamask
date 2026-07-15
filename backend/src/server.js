@@ -7,6 +7,9 @@ const connectDB = require('./config/db');
 dotenv.config();
 
 connectDB();
+const Student = require('./models/Student');
+
+createStudent();
 
 const app = express();
 
