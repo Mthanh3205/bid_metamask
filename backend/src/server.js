@@ -7,14 +7,23 @@ const connectDB = require('./config/db');
 dotenv.config();
 
 connectDB();
-const Student = require('./models/Student');
-
-createStudent();
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+//routes
+const authRoutes = require('./routes/authRoutes');
+const productRoutes = require('./routes/productRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
+const auctionRoutes = require('./routes/auctionRoutes');
+
+//use routes
+app.use('/api/auth', authRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/categories', categoryRoutes); 
+app.use('/api/auctions', auctionRoutes);
 
 app.get('/', (req, res) => {
   res.send('Backend is running...');
