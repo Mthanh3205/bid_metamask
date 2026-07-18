@@ -4,7 +4,7 @@ const dotenv = require('dotenv');
 
 const connectDB = require('./config/db');
 
-dotenv.config();
+require('dotenv').config();
 
 connectDB();
 
@@ -22,7 +22,7 @@ const auctionRoutes = require('./routes/auctionRoutes');
 //use routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
-app.use('/api/categories', categoryRoutes); 
+app.use('/api/categories', categoryRoutes);
 app.use('/api/auctions', auctionRoutes);
 
 app.get('/', (req, res) => {

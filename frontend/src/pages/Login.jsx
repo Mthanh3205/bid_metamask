@@ -23,19 +23,19 @@ const Login = () => {
   const handleEmailLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       // Gọi API thật xuống Backend
       const response = await api.post('/auth/login', formData);
-      
+
       const user = response.data.user;
-      
+
       // Lưu Token và Thông tin User vào LocalStorage
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(user));
-      
+
       alert(response.data.message); // Báo đăng nhập thành công
-      
+
       // ĐIỀU HƯỚNG DỰA TRÊN ROLE CỦA USER
       if (user.role === 'Admin') {
         navigate('/admin/dashboard');
@@ -45,7 +45,6 @@ const Login = () => {
         // Mặc định là Buyer
         navigate('/buyer/dashboard');
       }
-      
     } catch (error) {
       // Bắt lỗi từ BE (ví dụ: Sai mật khẩu)
       alert(error.response?.data?.message || 'Đăng nhập thất bại, vui lòng kiểm tra lại!');
@@ -66,7 +65,7 @@ const Login = () => {
       const provider = new BrowserProvider(window.ethereum);
       const accounts = await provider.send('eth_requestAccounts', []);
       const walletAddress = accounts[0];
-      
+
       alert(`Kết nối thành công ví: ${walletAddress}. Vui lòng đăng nhập bằng Email để liên kết.`);
       // Tạm thời hiển thị địa chỉ ví, phần đăng nhập hoàn toàn bằng Web3 sẽ cần Backend xử lý ký chuỗi (Sign Message).
     } catch (error) {
@@ -89,18 +88,42 @@ const Login = () => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><FaEnvelope /></span>
-              <input type="email" name="email" required value={formData.email} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition text-sm" placeholder="name@example.com" />
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                <FaEnvelope />
+              </span>
+              <input
+                type="email"
+                name="email"
+                required
+                value={formData.email}
+                onChange={handleInputChange}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition text-sm"
+                placeholder="name@example.com"
+              />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><FaLock /></span>
-              <input type="password" name="password" required value={formData.password} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition text-sm" placeholder="••••••••" />
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                <FaLock />
+              </span>
+              <input
+                type="password"
+                name="password"
+                required
+                value={formData.password}
+                onChange={handleInputChange}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition text-sm"
+                placeholder="••••••••"
+              />
             </div>
           </div>
-          <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl shadow transition text-sm disabled:bg-blue-400">
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl shadow transition text-sm disabled:bg-blue-400"
+          >
             {isLoading ? 'Đang xử lý...' : 'Đăng Nhập'}
           </button>
         </form>
@@ -111,12 +134,19 @@ const Login = () => {
           <div className="flex-grow border-t border-gray-200"></div>
         </div>
 
-        <button onClick={handleMetaMaskLogin} disabled={isLoading} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 rounded-xl shadow transition text-sm flex justify-center items-center gap-2 mb-6 disabled:bg-orange-400">
+        <button
+          onClick={handleMetaMaskLogin}
+          disabled={isLoading}
+          className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 rounded-xl shadow transition text-sm flex justify-center items-center gap-2 mb-6 disabled:bg-orange-400"
+        >
           <FaWallet /> Đăng nhập bằng MetaMask
         </button>
 
         <p className="text-center text-sm text-gray-600">
-          Chưa có tài khoản? <Link to="/register" className="text-blue-600 hover:underline font-medium">Đăng ký ngay</Link>
+          Chưa có tài khoản?{' '}
+          <Link to="/register" className="text-blue-600 hover:underline font-medium">
+            Đăng ký ngay
+          </Link>
         </p>
       </div>
     </div>
