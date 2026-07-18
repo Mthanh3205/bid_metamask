@@ -1,189 +1,269 @@
-import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { FaEthereum, FaWallet, FaClock, FaHistory, FaArrowLeft } from 'react-icons/fa';
+import { useEffect, useState, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
+import { useWeb3 } from '../contexts/Web3Context';
+import { useAuth } from '../contexts/AuthContext';
+import api from '../services/api';
+import { getAuctionInfo, placeBid, listenToEvents } from '../services/contract';
+import CountdownTimer from '../components/CountdownTimer';
+import { ethers } from 'ethers';
+import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 
-// Mock data: Chi tiết một phiên đấu giá
-const mockAuctionDetail = {
-  id: '1',
-  title: 'Đồng hồ Rolex Submariner (Phiên bản giới hạn)',
-  category: 'Trang sức & Đồng hồ',
-  condition: 'Mới (New)',
-  sellerAddress: '0x1234...abcd',
-  image: 'https://images.unsplash.com/photo-1523170335258-f5ed11844a49?q=80&w=1000&auto=format&fit=crop',
-  description: 'Chiếc đồng hồ Rolex Submariner nguyên bản, đi kèm hộp và giấy tờ chứng nhận. Đây là cơ hội tuyệt vời để sở hữu một tuyệt tác thời gian với tính minh bạch tuyệt đối qua Blockchain.',
-  startPrice: 1.5,
-  currentPrice: 2.5,
-  minIncrement: 0.1,
-  endTime: '2026-12-31T23:59:59', // Sẽ cần format lại khi làm thật
-  status: 'Active',
-};
-
-// Mock data: Lịch sử đặt giá (Bids)
-const mockBids = [
-  { id: 'b1', bidder: '0x71C...976F', amount: 2.5, time: '10 phút trước', txHash: '0xabc...123' },
-  { id: 'b2', bidder: '0x99B...442A', amount: 2.2, time: '1 giờ trước', txHash: '0xdef...456' },
-  { id: 'b3', bidder: '0x33A...881C', amount: 1.8, time: '3 giờ trước', txHash: '0xghi...789' },
-  { id: 'b4', bidder: '0x71C...976F', amount: 1.5, time: '1 ngày trước', txHash: '0xjkl...012' },
-];
-
-const AuctionDetail = () => {
-  const { id } = useParams(); // Lấy ID từ URL (VD: /auction/1)
-  const [bidAmount, setBidAmount] = useState('');
+export default function AuctionDetail() {
+  const { id } = useParams();
+  const { account, signer, provider, connectWallet } = useWeb3();
+  const { isAuthenticated } = useAuth();
   
-  // State giả lập trạng thái kết nối ví MetaMask (Sau này dùng Web3Context)
-  const [isWalletConnected, setIsWalletConnected] = useState(false);
+  const [auction, setAuction] = useState(null);
+  const [contractInfo, setContractInfo] = useState(null);
+  const [bidAmount, setBidAmount] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [bidding, setBidding] = useState(false);
+  const [message, setMessage] = useState(null);
+  const [bids, setBids] = useState([]);
 
-  const handleConnectWallet = () => {
-    // Logic gọi window.ethereum.request({ method: 'eth_requestAccounts' }) sẽ nằm ở đây
-    setIsWalletConnected(true);
+  useEffect(() => {
+    fetchAuctionDetail();
+  }, [id]);
+
+  useEffect(() => {
+    if (auction?.contractAddress && provider) {
+      fetchContractInfo();
+      const cleanup = listenToEvents(auction.contractAddress, provider, {
+        onBid: (bid) => {
+          setBids(prev => [bid, ...prev]);
+          fetchContractInfo(); // Refresh highest bid
+        }
+      });
+      return cleanup;
+    }
+  }, [auction, provider]);
+
+  const fetchAuctionDetail = async () => {
+    try {
+      const { data } = await api.get(`/auctions/${id}`);
+      setAuction(data);
+      // Fetch bid history từ backend
+      const { data: bidData } = await api.get(`/auctions/${id}/bids`);
+      setBids(bidData);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handlePlaceBid = (e) => {
-    e.preventDefault();
-    const amount = parseFloat(bidAmount);
-    const minRequired = mockAuctionDetail.currentPrice + mockAuctionDetail.minIncrement;
+  const fetchContractInfo = async () => {
+    if (!auction?.contractAddress || !provider) return;
+    try {
+      const info = await getAuctionInfo(auction.contractAddress, provider);
+      setContractInfo(info);
+    } catch (err) {
+      console.error('Lỗi đọc contract:', err);
+    }
+  };
 
-    if (!amount || amount < minRequired) {
-      alert(`Giá đặt phải lớn hơn hoặc bằng ${minRequired} ETH`);
+  const handlePlaceBid = async (e) => {
+    e.preventDefault();
+    
+    if (!account) {
+      await connectWallet();
+      return;
+    }
+    
+    if (!signer) {
+      setMessage({ type: 'error', text: 'Vui lòng kết nối MetaMask' });
       return;
     }
 
-    // Logic gọi Smart Contract ethers.js ( bid() ) sẽ nằm ở đây
-    alert(`Đang xử lý giao dịch đặt giá: ${amount} ETH qua MetaMask...`);
-    setBidAmount('');
+    const minBid = contractInfo 
+      ? parseFloat(contractInfo.highestBid) + parseFloat(contractInfo.minimumIncrement)
+      : auction.startingPrice;
+
+    if (parseFloat(bidAmount) < minBid) {
+      setMessage({ type: 'error', text: `Giá đặt phải >= ${minBid} ETH` });
+      return;
+    }
+
+    setBidding(true);
+    setMessage(null);
+
+    try {
+      // 1. Gọi smart contract
+      const receipt = await placeBid(auction.contractAddress, signer, bidAmount);
+      
+      // 2. Lưu vào backend
+      await api.post('/auctions/bid', {
+        auctionId: id,
+        bidAmount: parseFloat(bidAmount),
+        txHash: receipt.hash
+      });
+
+      setMessage({ type: 'success', text: 'Đặt giá thành công! 🎉' });
+      setBidAmount('');
+      fetchContractInfo();
+      fetchAuctionDetail();
+    } catch (err) {
+      console.error(err);
+      setMessage({ 
+        type: 'error', 
+        text: err.reason || err.message || 'Đặt giá thất bại' 
+      });
+    } finally {
+      setBidding(false);
+    }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4 sm:px-8 lg:px-16">
-      <div className="max-w-6xl mx-auto">
-        
-        {/* Nút quay lại */}
-        <Link to="/auctions" className="inline-flex items-center gap-2 text-gray-500 hover:text-blue-600 font-medium mb-6 transition">
-          <FaArrowLeft /> Quay lại danh sách
-        </Link>
+  if (loading) return <div className="text-center py-20">Đang tải...</div>;
+  if (!auction) return <div className="text-center py-20">Không tìm thấy đấu giá</div>;
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col lg:flex-row mb-8">
-          
-          {/* Cột trái: Hình ảnh sản phẩm */}
-          <div className="w-full lg:w-1/2 h-96 lg:h-auto relative bg-gray-100">
-            <img 
-              src={mockAuctionDetail.image} 
-              alt={mockAuctionDetail.title} 
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute top-4 left-4 bg-red-500 text-white text-sm font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow-md">
-              <FaClock /> Đang diễn ra
+  const currentPrice = contractInfo?.highestBid || auction.currentPrice;
+  const minNextBid = contractInfo 
+    ? parseFloat(contractInfo.highestBid) + parseFloat(contractInfo.minimumIncrement)
+    : auction.startingPrice;
+
+  return (
+    <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: Product Info */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="glass rounded-2xl p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h1 className="text-3xl font-bold mb-2">{auction.productId?.productName}</h1>
+                <p className="text-slate-400">Người bán: {auction.sellerId?.userName}</p>
+              </div>
+              <span className={`px-4 py-2 rounded-full text-sm font-medium ${
+                auction.status === 'Active' ? 'bg-green-500/20 text-green-400' : 'bg-slate-500/20'
+              }`}>
+                {auction.status}
+              </span>
+            </div>
+            
+            <div className="aspect-video rounded-xl bg-slate-800/50 flex items-center justify-center text-6xl mb-4">
+              🎨
+            </div>
+            
+            <div className="prose prose-invert">
+              <h3 className="text-lg font-semibold mb-2">Mô tả</h3>
+              <p className="text-slate-400">{auction.productId?.description || 'Không có mô tả'}</p>
             </div>
           </div>
 
-          {/* Cột phải: Thông tin & Đặt giá */}
-          <div className="w-full lg:w-1/2 p-8 lg:p-12 flex flex-col">
-            <span className="text-sm font-semibold text-blue-600 mb-2">{mockAuctionDetail.category}</span>
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">{mockAuctionDetail.title}</h1>
-            
-            <div className="flex gap-4 text-sm text-gray-600 mb-6">
-              <span className="bg-gray-100 px-3 py-1 rounded-full">Tình trạng: {mockAuctionDetail.condition}</span>
-              <span className="bg-gray-100 px-3 py-1 rounded-full">Người bán: {mockAuctionDetail.sellerAddress}</span>
-            </div>
-
-            <p className="text-gray-600 mb-8 line-clamp-3 leading-relaxed">
-              {mockAuctionDetail.description}
-            </p>
-
-            <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
-              <div className="flex justify-between items-end mb-2">
-                <span className="text-gray-500 font-medium">Giá cao nhất hiện tại</span>
-                <span className="text-4xl font-extrabold text-gray-900 flex items-center gap-2">
-                  <FaEthereum className="text-blue-600" /> {mockAuctionDetail.currentPrice}
-                </span>
-              </div>
-              <p className="text-sm text-gray-500 text-right">
-                Giá khởi điểm: {mockAuctionDetail.startPrice} ETH
-              </p>
-            </div>
-
-            {/* Khu vực Action: Kết nối ví hoặc Đặt giá */}
-            <div className="mt-auto">
-              {!isWalletConnected ? (
-                <button 
-                  onClick={handleConnectWallet}
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-xl shadow-lg transition duration-300 flex justify-center items-center gap-3 text-lg"
-                >
-                  <FaWallet className="text-xl" /> Kết nối MetaMask để Đấu Giá
-                </button>
+          {/* Bid History */}
+          <div className="glass rounded-2xl p-6">
+            <h3 className="text-lg font-semibold mb-4">📜 Lịch sử đặt giá</h3>
+            <div className="space-y-3">
+              {bids.length === 0 ? (
+                <p className="text-slate-500 text-center py-4">Chưa có lượt đặt giá nào</p>
               ) : (
-                <form onSubmit={handlePlaceBid} className="flex flex-col gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nhập giá (Tối thiểu: {(mockAuctionDetail.currentPrice + mockAuctionDetail.minIncrement).toFixed(2)} ETH)
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <FaEthereum className="text-gray-400" />
+                bids.map((bid, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-slate-900/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-purple-600/20 flex items-center justify-center text-sm">
+                        {bid.bidderId?.userName?.[0] || '?'}
                       </div>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={bidAmount}
-                        onChange={(e) => setBidAmount(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg font-semibold"
-                        placeholder="0.00"
-                      />
+                      <div>
+                        <p className="font-medium text-sm">{bid.bidderId?.userName || 'Unknown'}</p>
+                        <a 
+                          href={`https://sepolia.etherscan.io/tx/${bid.txHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-purple-400 hover:underline"
+                        >
+                          {bid.txHash?.slice(0, 10)}...{bid.txHash?.slice(-8)}
+                        </a>
+                      </div>
                     </div>
+                    <span className="font-bold text-purple-400">{bid.bidAmount} ETH</span>
                   </div>
-                  <button 
-                    type="submit"
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition duration-300 text-lg"
-                  >
-                    Xác nhận đặt giá
-                  </button>
-                </form>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Bid Panel */}
+        <div className="space-y-6">
+          <div className="glass rounded-2xl p-6 sticky top-24">
+            <div className="text-center mb-6">
+              <p className="text-sm text-slate-400 mb-1">Giá hiện tại</p>
+              <p className="text-4xl font-bold text-purple-400">{currentPrice} ETH</p>
+              {auction.status === 'Active' && (
+                <p className="text-sm text-slate-400 mt-2">
+                  Kết thúc sau: <CountdownTimer endTime={auction.endTime} />
+                </p>
               )}
             </div>
 
+            {auction.status === 'Active' && (
+              <form onSubmit={handlePlaceBid} className="space-y-4">
+                {message && (
+                  <div className={`p-3 rounded-xl flex items-center gap-2 text-sm ${
+                    message.type === 'success' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                  }`}>
+                    {message.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                    {message.text}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm text-slate-400 mb-2">
+                    Giá đặt (tối thiểu {minNextBid} ETH)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.001"
+                      value={bidAmount}
+                      onChange={(e) => setBidAmount(e.target.value)}
+                      className="input-field pr-16"
+                      placeholder="0.0"
+                      required
+                    />
+                    <span className="absolute right-4 top-3.5 text-slate-500 font-medium">ETH</span>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={bidding}
+                  className="w-full btn-primary flex items-center justify-center gap-2"
+                >
+                  {bidding ? <Loader2 className="w-5 h-5 animate-spin" /> : '💰 Đặt giá ngay'}
+                </button>
+
+                {!account && (
+                  <p className="text-xs text-center text-slate-500">
+                    Bạn cần kết nối MetaMask để đặt giá
+                  </p>
+                )}
+              </form>
+            )}
+
+            <div className="mt-6 pt-6 border-t border-slate-700/50 space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Giá khởi điểm</span>
+                <span>{auction.startingPrice} ETH</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Bước giá tối thiểu</span>
+                <span>{auction.minimumIncrement} ETH</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Contract</span>
+                <a 
+                  href={`https://sepolia.etherscan.io/address/${auction.contractAddress}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-purple-400 hover:underline font-mono"
+                >
+                  {auction.contractAddress?.slice(0, 6)}...{auction.contractAddress?.slice(-4)}
+                </a>
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* Khu vực bên dưới: Lịch sử đấu giá */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-            <FaHistory className="text-blue-500" /> Lịch sử đặt giá
-          </h2>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
-                  <th className="py-4 px-6 font-medium rounded-tl-lg">Người tham gia</th>
-                  <th className="py-4 px-6 font-medium">Giá đặt (ETH)</th>
-                  <th className="py-4 px-6 font-medium">Thời gian</th>
-                  <th className="py-4 px-6 font-medium rounded-tr-lg">TxHash (Blockchain)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {mockBids.map((bid, index) => (
-                  <tr key={bid.id} className="hover:bg-gray-50 transition">
-                    <td className="py-4 px-6 font-medium text-gray-800">
-                      {bid.bidder}
-                      {index === 0 && <span className="ml-3 bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">Đang dẫn đầu</span>}
-                    </td>
-                    <td className="py-4 px-6 font-bold text-blue-600">{bid.amount}</td>
-                    <td className="py-4 px-6 text-gray-500">{bid.time}</td>
-                    <td className="py-4 px-6">
-                      <a href={`#${bid.txHash}`} className="text-blue-500 hover:underline font-mono text-sm">
-                        {bid.txHash}
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
       </div>
     </div>
   );
-};
-
-export default AuctionDetail;
+}

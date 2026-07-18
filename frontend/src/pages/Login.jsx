@@ -1,26 +1,16 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaEnvelope, FaLock, FaWallet } from 'react-icons/fa';
-import { BrowserProvider } from 'ethers';
-import api from '../utils/api'; // Sử dụng instance api đã cấu hình
+import { useAuth } from '../contexts/AuthContext';
+import { Loader2 } from 'lucide-react';
 
-const Login = () => {
+export default function Login() {
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { login } = useAuth();
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
-  const [isLoading, setIsLoading] = useState(false);
 
-  const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  // 1. Logic Đăng nhập truyền thống bằng Email & Password
-  const handleEmailLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
 

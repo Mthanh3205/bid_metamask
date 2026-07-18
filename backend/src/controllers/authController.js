@@ -18,6 +18,32 @@ exports.register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     // 3. Tạo user mới
+    let { userName, email, password, phone, address, walletAddress, role } = req.body;
+
+    // ⚠️ FIX: Chuyển chuỗi rỗng thành null để tránh lỗi unique index
+    if (!walletAddress || walletAddress.trim() === '') {
+      walletAddress = null;
+    }
+
+    // Kiểm tra email đã tồn tại chưa
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: 'Email đã được sử dụng!' });
+    }
+
+    // Kiểm tra walletAddress đã tồn tại chưa (nếu có nhập)
+    if (walletAddress) {
+      const walletExists = await User.findOne({ walletAddress });
+      if (walletExists) {
+        return res.status(400).json({ message: 'Địa chỉ ví đã được sử dụng!' });
+      }
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Tạo user
     const user = await User.create({
       userName,
       email,
@@ -30,6 +56,20 @@ exports.register = async (req, res) => {
 
     res.status(201).json({
       message: 'Đăng ký tài khoản thành công!',
+      phone: phone || '',
+      address: address || '',
+      walletAddress, // null nếu không nhập
+      role: role || 'Buyer',
+    });
+
+    // Tạo token luôn để tự động đăng nhập sau khi đăng ký
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+      expiresIn: '7d',
+    });
+
+    res.status(201).json({
+      message: 'Đăng ký thành công!',
+      token, // ← trả token để frontend tự động login
       user: {
         _id: user._id,
         userName: user.userName,

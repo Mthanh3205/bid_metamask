@@ -1,96 +1,73 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { 
-  FaWallet, 
-  FaGavel, 
-  FaSignInAlt, 
-  FaUserPlus, 
-  FaUser, 
-  FaSignOutAlt, 
-  FaCog, 
-  FaStore 
-} from 'react-icons/fa';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useWeb3 } from '../contexts/Web3Context';
+import { Gavel, Wallet, LogOut, User } from 'lucide-react';
 
-const Navbar = () => {
-  // Lấy thông tin user từ LocalStorage
-  const userString = localStorage.getItem('user');
-  const user = userString ? JSON.parse(userString) : null;
+export default function Navbar() {
+  const { user, logout, isAuthenticated } = useAuth();
+  const { account, balance, connectWallet, disconnectWallet, isCorrectNetwork } = useWeb3();
+  const navigate = useNavigate();
 
-  // Hàm xử lý Đăng xuất
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/login'; 
+    logout();
+    disconnectWallet();
+    navigate('/login');
   };
 
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-100 p-4 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto flex justify-between items-center">
-        {/* Logo */}
-        <Link to="/" className="text-2xl font-extrabold text-blue-900 flex items-center gap-2">
-          <FaGavel className="text-blue-600" /> DApp Auction
+    <nav className="sticky top-0 z-50 glass border-b border-slate-700/50">
+      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2">
+          <Gavel className="w-6 h-6 text-purple-400" />
+          <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+            AuctionChain
+          </span>
         </Link>
-        
-        {/* Menu & Nút chức năng */}
-        <div className="hidden md:flex space-x-6 items-center">
+
+        <div className="flex items-center gap-4">
+          <Link to="/auctions" className="text-slate-300 hover:text-white transition-colors">Đấu giá</Link>
           
-          <Link to="/" className="text-gray-600 hover:text-blue-600 font-medium transition">Trang chủ</Link>
-          <Link to="/auctions" className="text-gray-600 hover:text-blue-600 font-medium transition">Khám phá</Link>
-          
-          <div className="h-6 w-px bg-gray-300 mx-2"></div>
-          
-          {/* Kiểm tra trạng thái đăng nhập */}
-          {user ? (
-            <div className="flex items-center gap-4">
+          {isAuthenticated && user?.role === 'Seller' && (
+            <Link to="/create" className="text-slate-300 hover:text-white transition-colors">Tạo đấu giá</Link>
+          )}
+
+          {isAuthenticated ? (
+            <>
+              <Link to="/profile" className="flex items-center gap-2 text-slate-300 hover:text-white">
+                <User className="w-4 h-4" />
+                <span className="hidden sm:inline">{user?.userName}</span>
+              </Link>
               
-              {/* Phân luồng Nút Dashboard theo Role */}
-              {user.role === 'Admin' && (
-                <Link to="/admin/dashboard" className="bg-gray-800 text-white hover:bg-gray-900 font-medium py-2 px-4 rounded-lg transition flex items-center gap-2 shadow-sm border border-gray-700">
-                  <FaCog /> Quản trị Admin
-                </Link>
-              )}
-              {user.role === 'Seller' && (
-                <Link to="/seller/dashboard" className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium py-2 px-4 rounded-lg transition flex items-center gap-2 border border-emerald-200">
-                  <FaStore /> Kênh Người Bán
-                </Link>
-              )}
-              {user.role === 'Buyer' && (
-                <Link to="/buyer/dashboard" className="bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium py-2 px-4 rounded-lg transition flex items-center gap-2 border border-blue-200">
-                  <FaUser /> Hồ sơ của tôi
-                </Link>
+              {account ? (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700">
+                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                  <span className="text-sm font-mono text-slate-300">
+                    {account.slice(0, 6)}...{account.slice(-4)}
+                  </span>
+                  <span className="text-xs text-purple-400">{parseFloat(balance).toFixed(4)} ETH</span>
+                  {!isCorrectNetwork && (
+                    <span className="text-xs text-red-400">⚠️ Sai mạng</span>
+                  )}
+                </div>
+              ) : (
+                <button onClick={connectWallet} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 transition-all">
+                  <Wallet className="w-4 h-4" />
+                  Kết nối ví
+                </button>
               )}
 
-              {/* Lời chào & Đăng xuất */}
-              <div className="flex items-center gap-3 ml-2 pl-4 border-l border-gray-200">
-                <span className="text-sm font-medium text-gray-700">
-                  Chào, {user.userName.split(' ').pop()}
-                </span>
-                <button 
-                  onClick={handleLogout} 
-                  className="text-gray-400 hover:text-red-600 font-medium transition flex items-center gap-1 text-sm"
-                  title="Đăng xuất"
-                >
-                  <FaSignOutAlt size={18} />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <Link to="/login" className="text-gray-600 hover:text-blue-600 font-medium transition flex items-center gap-2">
-                <FaSignInAlt /> Đăng nhập
-              </Link>
-              <Link to="/register" className="bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium py-2 px-4 rounded-lg transition flex items-center gap-2">
-                <FaUserPlus /> Đăng ký
-              </Link>
-              <button className="bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-300 flex items-center gap-2 ml-2">
-                <FaWallet /> Kết nối ví
+              <button onClick={handleLogout} className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-red-400 transition-all">
+                <LogOut className="w-4 h-4" />
               </button>
+            </>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Link to="/login" className="px-4 py-2 rounded-lg text-slate-300 hover:text-white transition-colors">Đăng nhập</Link>
+              <Link to="/register" className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-500 transition-colors">Đăng ký</Link>
             </div>
           )}
         </div>
       </div>
     </nav>
   );
-};
-
-export default Navbar;
+}

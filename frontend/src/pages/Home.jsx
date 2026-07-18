@@ -1,133 +1,90 @@
-import React from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FaEthereum, FaGavel, FaShieldAlt } from 'react-icons/fa';
+import AuctionCard from '../components/AuctionCard';
+import api from '../services/api';
+import { TrendingUp, Shield, Zap, Globe } from 'lucide-react';
 
-// Mock data: Dữ liệu giả lập cho các phiên đấu giá đang diễn ra
-const mockAuctions = [
-  {
-    id: '1',
-    title: 'Đồng hồ Rolex Submariner',
-    image: 'https://images.unsplash.com/photo-1523170335258-f5ed11844a49?q=80&w=600&auto=format&fit=crop',
-    currentBid: 2.5,
-    endTime: '2h 15m left',
-  },
-  {
-    id: '2',
-    title: 'Bức tranh kỹ thuật số NFT #1024',
-    image: 'https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?q=80&w=600&auto=format&fit=crop',
-    currentBid: 0.8,
-    endTime: '5h 30m left',
-  },
-  {
-    id: '3',
-    title: 'MacBook Pro M3 Max (Used)',
-    image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=600&auto=format&fit=crop',
-    currentBid: 1.2,
-    endTime: '12h 45m left',
-  },
-];
+export default function Home() {
+  const [auctions, setAuctions] = useState([]);
+  const [stats, setStats] = useState({ total: 0, active: 0, volume: 0 });
 
-const Home = () => {
+  useEffect(() => {
+    fetchAuctions();
+  }, []);
+
+  const fetchAuctions = async () => {
+    try {
+      const { data } = await api.get('/auctions?status=Active&limit=6');
+      setAuctions(data.auctions || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800">
-      {/* Hero Section */}
-      <section className="bg-gradient-to-r from-blue-900 to-indigo-800 text-white py-20 px-6 sm:px-12 lg:px-24">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center">
-          <div className="md:w-1/2 mb-10 md:mb-0">
-            <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-6">
-              Đấu Giá Minh Bạch Tích Hợp <span className="text-blue-400">Blockchain</span>
-            </h1>
-            <p className="text-lg md:text-xl mb-8 text-gray-300">
-              Trải nghiệm nền tảng đấu giá tài sản trực tuyến an toàn, minh bạch và không thể sửa đổi. Thanh toán nhanh chóng và bảo mật qua ví MetaMask.
-            </p>
-            <div className="flex gap-4">
-              <Link
-                to="/auctions"
-                className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition duration-300"
-              >
-                Khám Phá Ngay
-              </Link>
-              <Link
-                to="/create-auction"
-                className="bg-transparent border border-white hover:bg-white hover:text-blue-900 text-white font-bold py-3 px-8 rounded-lg transition duration-300"
-              >
-                Tạo Phiên Đấu Giá
-              </Link>
-            </div>
-          </div>
-          <div className="md:w-1/2 flex justify-center">
-            {/* Có thể thay bằng một ảnh vector/3D liên quan đến blockchain */}
-            <div className="w-72 h-72 bg-blue-800 rounded-full flex items-center justify-center shadow-2xl border-4 border-blue-400">
-              <FaEthereum className="text-9xl text-gray-100" />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-16 px-6 sm:px-12 lg:px-24 max-w-7xl mx-auto">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-800">Tại sao chọn hệ thống của chúng tôi?</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="bg-white p-8 rounded-xl shadow-md text-center border border-gray-100">
-            <FaShieldAlt className="text-5xl text-blue-500 mx-auto mb-4" />
-            <h3 className="text-xl font-bold mb-3">Minh Bạch Tuyệt Đối</h3>
-            <p className="text-gray-600">Lịch sử đặt giá được lưu trữ trên Blockchain, đảm bảo không ai có thể can thiệp hoặc sửa đổi.</p>
-          </div>
-          <div className="bg-white p-8 rounded-xl shadow-md text-center border border-gray-100">
-            <FaEthereum className="text-5xl text-blue-500 mx-auto mb-4" />
-            <h3 className="text-xl font-bold mb-3">Thanh Toán Bằng ETH</h3>
-            <p className="text-gray-600">Sử dụng tiền điện tử và ví MetaMask để giao dịch nhanh chóng, an toàn và hoàn toàn phi tập trung.</p>
-          </div>
-          <div className="bg-white p-8 rounded-xl shadow-md text-center border border-gray-100">
-            <FaGavel className="text-5xl text-blue-500 mx-auto mb-4" />
-            <h3 className="text-xl font-bold mb-3">Smart Contract</h3>
-            <p className="text-gray-600">Hợp đồng thông minh tự động xác định người thắng và chuyển quyền sở hữu mà không cần bên thứ ba.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Active Auctions Section */}
-      <section className="py-16 px-6 sm:px-12 lg:px-24 bg-gray-100">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex justify-between items-end mb-10">
-            <h2 className="text-3xl font-bold text-gray-800">Phiên Đấu Giá Nổi Bật</h2>
-            <Link to="/auctions" className="text-blue-600 hover:text-blue-800 font-semibold hover:underline">
-              Xem tất cả &rarr;
+    <div className="max-w-7xl mx-auto px-6 py-8 space-y-12">
+      {/* Hero */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-purple-900/40 to-slate-800/40 border border-purple-500/20 p-8 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          <h1 className="text-4xl font-bold mb-4">Đấu giá phi tập trung trên Blockchain</h1>
+          <p className="text-slate-400 mb-6 max-w-lg">
+            Kết nối ví MetaMask, tham gia đấu giá minh bạch với smart contract Solidity. 
+            Mọi giao dịch đều được ghi nhận trên blockchain.
+          </p>
+          <div className="flex gap-3">
+            <Link to="/auctions" className="btn-primary">Khám phá</Link>
+            <Link to="/create" className="px-6 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 transition-all font-medium">
+              Tạo đấu giá
             </Link>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {mockAuctions.map((auction) => (
-              <div key={auction.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition duration-300">
-                <div className="h-48 overflow-hidden relative">
-                  <img src={auction.image} alt={auction.title} className="w-full h-full object-cover" />
-                  <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-                    {auction.endTime}
-                  </div>
-                </div>
-                <div className="p-6">
-                  <h3 className="text-lg font-bold mb-2 text-gray-800 truncate">{auction.title}</h3>
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-gray-500 text-sm">Giá hiện tại</span>
-                    <span className="text-xl font-bold text-blue-600 flex items-center gap-1">
-                      <FaEthereum /> {auction.currentBid} ETH
-                    </span>
-                  </div>
-                  <Link
-                    to={`/auction/${auction.id}`}
-                    className="block w-full text-center bg-gray-800 hover:bg-gray-900 text-white font-semibold py-2 rounded-lg transition duration-200"
-                  >
-                    Tham gia ngay
-                  </Link>
-                </div>
+        </div>
+
+        <div className="rounded-2xl glass p-6">
+          <h3 className="text-lg font-semibold mb-4 text-purple-300">📊 Thống kê</h3>
+          <div className="space-y-4">
+            {[
+              { label: 'Tổng đấu giá', value: stats.total, color: 'text-white' },
+              { label: 'Đang diễn ra', value: stats.active, color: 'text-green-400' },
+              { label: 'Khối lượng ETH', value: stats.volume, color: 'text-purple-400' }
+            ].map((stat, i) => (
+              <div key={i} className="flex justify-between items-center p-3 rounded-xl bg-slate-900/50">
+                <span className="text-slate-400">{stat.label}</span>
+                <span className={`font-bold text-xl ${stat.color}`}>{stat.value}</span>
               </div>
             ))}
           </div>
         </div>
-      </section>
+      </div>
+
+      {/* Features */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {[
+          { icon: Shield, title: 'Minh bạch', desc: 'Mọi giao dịch trên blockchain' },
+          { icon: Zap, title: 'Tức thì', desc: 'Xác nhận bid real-time' },
+          { icon: Globe, title: 'Toàn cầu', desc: 'Không giới hạn địa lý' },
+          { icon: TrendingUp, title: 'An toàn', desc: 'Smart contract tự động' }
+        ].map((f, i) => (
+          <div key={i} className="glass p-5 rounded-xl text-center">
+            <f.icon className="w-8 h-8 mx-auto mb-3 text-purple-400" />
+            <h4 className="font-semibold mb-1">{f.title}</h4>
+            <p className="text-sm text-slate-500">{f.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Featured Auctions */}
+      <div>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold">🔥 Đấu giá nổi bật</h2>
+          <Link to="/auctions" className="text-purple-400 hover:text-purple-300">Xem tất cả →</Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {auctions.map(auction => (
+            <AuctionCard key={auction._id} auction={auction} />
+          ))}
+        </div>
+      </div>
     </div>
   );
-};
-
-export default Home;
+}
