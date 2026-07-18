@@ -12,10 +12,11 @@ export default function Home() {
     fetchAuctions();
   }, []);
 
+  // Trong Home.jsx
   const fetchAuctions = async () => {
     try {
-      const { data } = await api.get('/auctions?status=Active&limit=6');
-      setAuctions(data.auctions || []);
+      const { data } = await api.get('/auctions?status=all');
+      setAuctions(Array.isArray(data) ? data.slice(0, 6) : []);
     } catch (err) {
       console.error(err);
     }
@@ -29,7 +30,7 @@ export default function Home() {
           <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
           <h1 className="text-4xl font-bold mb-4">Đấu giá phi tập trung trên Blockchain</h1>
           <p className="text-slate-400 mb-6 max-w-lg">
-            Kết nối ví MetaMask, tham gia đấu giá minh bạch với smart contract Solidity. 
+            Kết nối ví MetaMask, tham gia đấu giá minh bạch với smart contract Solidity.
             Mọi giao dịch đều được ghi nhận trên blockchain.
           </p>
           <div className="flex gap-3">

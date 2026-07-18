@@ -106,3 +106,42 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: 'Lỗi server khi đăng nhập!', error: error.message });
   }
 };
+
+// [GET] Lấy profile user hiện tại
+exports.getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy người dùng!' });
+    }
+    res.status(200).json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi server!', error: error.message });
+  }
+};
+
+// [PUT] Cập nhật địa chỉ ví
+exports.updateWallet = async (req, res) => {
+  try {
+    const { walletAddress } = req.body;
+    
+    // Kiểm tra ví đã có ai dùng chưa (trừ chính mình)
+    const exists = await User.findOne({ walletAddress, _id: { $ne: req.user.id } });
+    if (exists) {
+      return res.status(400).json({ message: 'Địa chỉ ví đã được sử dụng!' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { walletAddress: walletAddress || null },
+      { new: true }
+    ).select('-password');
+
+    res.status(200).json({ 
+      message: 'Cập nhật ví thành công!', 
+      walletAddress: user.walletAddress 
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi server!', error: error.message });
+  }
+};

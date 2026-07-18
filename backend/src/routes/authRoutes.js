@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
+const { verifyToken } = require('../middlewares/authMiddleware');
 
-// Route Đăng ký: http://localhost:5000/api/auth/register
 router.post('/register', authController.register);
-
-// Route Đăng nhập: http://localhost:5000/api/auth/login
 router.post('/login', authController.login);
+router.get('/profile', verifyToken, authController.getProfile);      
+router.put('/wallet', verifyToken, authController.updateWallet); 
 
 module.exports = router;
