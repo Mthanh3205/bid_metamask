@@ -9,11 +9,11 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (token && token !== 'undefined') {
+    if (token && token !== 'undefined' && token !== 'null') {
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       fetchProfile();
     } else {
-      localStorage.removeItem('token'); // dọn token rác
+      localStorage.removeItem('token');
       setLoading(false);
     }
   }, []);
@@ -39,7 +39,6 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     const { data } = await api.post('/auth/register', userData);
-    // Backend giờ trả token → tự động login
     localStorage.setItem('token', data.token);
     api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
     setUser(data.user);
@@ -52,9 +51,20 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  // ⚠️ FIX: Bọc try-catch, không throw ra ngoài
   const updateWallet = async (walletAddress) => {
-    const { data } = await api.put('/auth/wallet', { walletAddress });
-    setUser(prev => ({ ...prev, walletAddress: data.walletAddress }));
+    try {
+      if (!walletAddress) return { success: false, error: 'Không có địa chỉ ví' };
+      
+      const { data } = await api.put('/auth/wallet', { walletAddress });
+      setUser(prev => ({ ...prev, walletAddress: data.walletAddress }));
+      return { success: true, walletAddress: data.walletAddress };
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Không thể cập nhật ví';
+      console.warn('Update wallet failed:', msg);
+      // Không throw → app không crash
+      return { success: false, error: msg };
+    }
   };
 
   return (

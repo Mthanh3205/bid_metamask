@@ -5,7 +5,7 @@ import { Gavel, Wallet, LogOut, User } from 'lucide-react';
 
 export default function Navbar() {
   const { user, logout, isAuthenticated } = useAuth();
-  const { account, balance, connectWallet, disconnectWallet, isCorrectNetwork } = useWeb3();
+  const { account, balance, connectWallet, disconnectWallet, isCorrectNetwork, switchNetwork } = useWeb3(); // ← THÊM switchNetwork
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -26,7 +26,7 @@ export default function Navbar() {
 
         <div className="flex items-center gap-4">
           <Link to="/auctions" className="text-slate-300 hover:text-white transition-colors">Đấu giá</Link>
-          
+
           {isAuthenticated && user?.role === 'Seller' && (
             <Link to="/create" className="text-slate-300 hover:text-white transition-colors">Tạo đấu giá</Link>
           )}
@@ -37,7 +37,7 @@ export default function Navbar() {
                 <User className="w-4 h-4" />
                 <span className="hidden sm:inline">{user?.userName}</span>
               </Link>
-              
+
               {account ? (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700">
                   <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
@@ -46,7 +46,12 @@ export default function Navbar() {
                   </span>
                   <span className="text-xs text-purple-400">{parseFloat(balance).toFixed(4)} ETH</span>
                   {!isCorrectNetwork && (
-                    <span className="text-xs text-red-400">⚠️ Sai mạng</span>
+                    <button
+                      onClick={switchNetwork}
+                      className="px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-xs hover:bg-red-500/30 transition-all"
+                    >
+                      ⚠️ Sai mạng
+                    </button>
                   )}
                 </div>
               ) : (

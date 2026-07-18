@@ -1,23 +1,39 @@
 const Product = require('../models/Product');
+const Category = require('../models/Category');  
+const mongoose = require('mongoose');
 
-// [POST] Dành cho Seller: Đăng sản phẩm mới
+// [POST] Tạo sản phẩm mới
 exports.createProduct = async (req, res) => {
     try {
-        const { categoryId, productName, description, condition, estimatedPrice } = req.body;
+        let { productName, categoryId, condition, description, estimatedPrice } = req.body;
+
+        if (!categoryId || categoryId.trim() === '') {
+            return res.status(400).json({ message: 'Vui lòng chọn danh mục!' });
+        }
+
+        let finalCategoryId = categoryId;
+        
+        if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+            let cat = await Category.findOne({ categoryName: categoryId });
+            if (!cat) {
+                cat = await Category.create({ categoryName: categoryId });
+            }
+            finalCategoryId = cat._id;
+        }
 
         const product = await Product.create({
-            sellerId: req.user._id, // Lấy ID từ token đã xác thực
-            categoryId,
             productName,
-            description,
+            categoryId: finalCategoryId,
             condition,
+            description,
             estimatedPrice,
-            status: 'Pending' // Mặc định chờ duyệt
+            sellerId: req.user._id
         });
 
-        res.status(201).json({ message: 'Đăng sản phẩm thành công, vui lòng chờ duyệt!', product });
+        res.status(201).json({ message: 'Tạo sản phẩm thành công!', product });
     } catch (error) {
-        res.status(500).json({ message: 'Lỗi khi đăng sản phẩm!', error: error.message });
+        console.error('Create product error:', error);
+        res.status(500).json({ message: 'Lỗi server!', error: error.message });
     }
 };
 

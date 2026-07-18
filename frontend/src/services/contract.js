@@ -1,588 +1,165 @@
 import { ethers } from 'ethers';
 
-export const AUCTION_ABI = [
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "_admin",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "constructor"
-    },
-    {
-      "inputs": [],
-      "name": "AuctionAlreadyFinalized",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "AuctionNotActive",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "AuctionNotFound",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "AuctionNotStarted",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "AuctionNotYetEnded",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "BidTooLow",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "CannotCancelAfterBids",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "CannotCancelFinalizedAuction",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "InvalidIncrement",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "InvalidStartingPrice",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "InvalidTimeRange",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "NoFundsToWithdraw",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "NotSeller",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "ReentrancyGuardReentrantCall",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "SellerCannotBid",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "TransferToSellerFailed",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "WithdrawFailed",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "ZeroAddress",
-      "type": "error"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "auctionId",
-          "type": "uint256"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "seller",
-          "type": "address"
-        }
-      ],
-      "name": "AuctionCancelled",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "auctionId",
-          "type": "uint256"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "seller",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "string",
-          "name": "productId",
-          "type": "string"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "startingPrice",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "minIncrement",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "startTime",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "endTime",
-          "type": "uint256"
-        }
-      ],
-      "name": "AuctionCreated",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "auctionId",
-          "type": "uint256"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "winner",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "winningBid",
-          "type": "uint256"
-        }
-      ],
-      "name": "AuctionEnded",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "auctionId",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "newEndTime",
-          "type": "uint256"
-        }
-      ],
-      "name": "AuctionExtended",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "auctionId",
-          "type": "uint256"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "bidder",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "timestamp",
-          "type": "uint256"
-        }
-      ],
-      "name": "BidPlaced",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "bidder",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        }
-      ],
-      "name": "Withdrawn",
-      "type": "event"
-    },
-    {
-      "inputs": [],
-      "name": "EXTENSION_DURATION",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "EXTENSION_WINDOW",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "admin",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "auctionId",
-          "type": "uint256"
-        }
-      ],
-      "name": "bid",
-      "outputs": [],
-      "stateMutability": "payable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "auctionId",
-          "type": "uint256"
-        }
-      ],
-      "name": "cancelAuction",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "string",
-          "name": "productId",
-          "type": "string"
-        },
-        {
-          "internalType": "uint256",
-          "name": "startingPrice",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "minIncrement",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "startTime",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "endTime",
-          "type": "uint256"
-        }
-      ],
-      "name": "createAuction",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "auctionId",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "auctionId",
-          "type": "uint256"
-        }
-      ],
-      "name": "endAuction",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "auctionId",
-          "type": "uint256"
-        }
-      ],
-      "name": "getAuction",
-      "outputs": [
-        {
-          "components": [
-            {
-              "internalType": "uint256",
-              "name": "auctionId",
-              "type": "uint256"
-            },
-            {
-              "internalType": "address",
-              "name": "seller",
-              "type": "address"
-            },
-            {
-              "internalType": "string",
-              "name": "productId",
-              "type": "string"
-            },
-            {
-              "internalType": "uint256",
-              "name": "startingPrice",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "minIncrement",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "startTime",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "endTime",
-              "type": "uint256"
-            },
-            {
-              "internalType": "address",
-              "name": "highestBidder",
-              "type": "address"
-            },
-            {
-              "internalType": "uint256",
-              "name": "highestBid",
-              "type": "uint256"
-            },
-            {
-              "internalType": "enum AuctionStructs.AuctionStatus",
-              "name": "status",
-              "type": "uint8"
-            }
-          ],
-          "internalType": "struct AuctionStructs.Auction",
-          "name": "",
-          "type": "tuple"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "auctionId",
-          "type": "uint256"
-        }
-      ],
-      "name": "getHighestBid",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "auctionId",
-          "type": "uint256"
-        }
-      ],
-      "name": "getWinner",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "bidder",
-          "type": "address"
-        }
-      ],
-      "name": "pendingReturnOf",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "withdraw",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    }
-  ];
+// Địa chỉ contract đã deploy trên Sepolia
+export const MARKETPLACE_ADDRESS = '0x2E9Ea2062A5E92057371e1A592385f30cF64D126';
 
-export const getAuctionContract = (contractAddress, signerOrProvider) => {
-  return new ethers.Contract(contractAddress, AUCTION_ABI, signerOrProvider);
+export const MARKETPLACE_ABI = [
+  // View / Pure
+  "function admin() view returns (address)",
+  "function getAuction(uint256 auctionId) view returns (tuple(uint256 auctionId, address seller, string productId, uint256 startingPrice, uint256 minIncrement, uint256 startTime, uint256 endTime, address highestBidder, uint256 highestBid, uint8 status))",
+  "function getHighestBid(uint256 auctionId) view returns (uint256)",
+  "function getWinner(uint256 auctionId) view returns (address)",
+  "function pendingReturnOf(address bidder) view returns (uint256)",
+
+  // Write
+  "function createAuction(string productId, uint256 startingPrice, uint256 minIncrement, uint256 startTime, uint256 endTime) returns (uint256 auctionId)",
+  "function bid(uint256 auctionId) payable",
+  "function withdraw()",
+  "function endAuction(uint256 auctionId)",
+  "function cancelAuction(uint256 auctionId)",
+
+  // Events
+  "event AuctionCreated(uint256 indexed auctionId, address indexed seller, string productId, uint256 startingPrice, uint256 minIncrement, uint256 startTime, uint256 endTime)",
+  "event BidPlaced(uint256 indexed auctionId, address indexed bidder, uint256 amount, uint256 timestamp)",
+  "event AuctionEnded(uint256 indexed auctionId, address indexed winner, uint256 amount)",
+  "event AuctionCancelled(uint256 indexed auctionId, address indexed seller)",
+  "event AuctionExtended(uint256 indexed auctionId, uint256 newEndTime)",
+  "event Withdrawn(address indexed bidder, uint256 amount)",
+];
+
+// Status enum
+export const AUCTION_STATUS = {
+  0: 'Upcoming',
+  1: 'Active',
+  2: 'Ended',
+  3: 'Cancelled'
 };
 
-export const placeBid = async (contractAddress, signer, amount) => {
-  const contract = getAuctionContract(contractAddress, signer);
-  const tx = await contract.placeBid({
-    value: ethers.parseEther(amount.toString())
+// Helper
+export const getMarketplaceContract = (signerOrProvider) => {
+  return new ethers.Contract(MARKETPLACE_ADDRESS, MARKETPLACE_ABI, signerOrProvider);
+};
+
+// ⚠️ FIX: Dùng Contract instance thay vì ContractFactory
+export const createAuctionOnChain = async (signer, { productId, startingPrice, minIncrement, startTime, endTime }) => {
+  const contract = getMarketplaceContract(signer);
+  
+  const startTimeSec = Math.floor(new Date(startTime).getTime() / 1000);
+  const endTimeSec = Math.floor(new Date(endTime).getTime() / 1000);
+  const nowSec = Math.floor(Date.now() / 1000);
+  const safeStartTime = Math.max(startTimeSec, nowSec + 60);
+
+  console.log('Calling createAuction with:', { productId, startingPrice, minIncrement, safeStartTime, endTimeSec });
+
+  const tx = await contract.createAuction(
+    productId,
+    ethers.parseEther(startingPrice.toString()),
+    ethers.parseEther(minIncrement.toString()),
+    safeStartTime,
+    endTimeSec
+  );
+  
+  const receipt = await tx.wait();
+  console.log('Receipt logs:', receipt.logs);  
+
+  // Parse event từ receipt
+  let auctionId = null;
+  for (const log of receipt.logs) {
+    try {
+      const parsed = contract.interface.parseLog(log);
+      if (parsed?.name === 'AuctionCreated') {
+        auctionId = Number(parsed.args.auctionId);
+        console.log('Found AuctionCreated event, auctionId:', auctionId);
+        break;
+      }
+    } catch (e) {
+      // Bỏ qua log không parse được
+    }
+  }
+
+  if (auctionId === null) {
+    throw new Error('Không tìm thấy event AuctionCreated trong receipt!');
+  }
+
+  return { txHash: receipt.hash, auctionId };
+};
+
+// Đặt giá
+export const placeBid = async (signer, auctionId, amountEth) => {
+  const contract = getMarketplaceContract(signer);
+  const tx = await contract.bid(auctionId, {
+    value: ethers.parseEther(amountEth.toString())
   });
   return await tx.wait();
 };
 
-export const withdrawBid = async (contractAddress, signer) => {
-  const contract = getAuctionContract(contractAddress, signer);
+// Rút tiền hoàn trả
+export const withdrawFunds = async (signer) => {
+  const contract = getMarketplaceContract(signer);
   const tx = await contract.withdraw();
   return await tx.wait();
 };
 
-export const endAuction = async (contractAddress, signer) => {
-  const contract = getAuctionContract(contractAddress, signer);
-  const tx = await contract.endAuction();
+// Kết thúc auction
+export const endAuction = async (signer, auctionId) => {
+  const contract = getMarketplaceContract(signer);
+  const tx = await contract.endAuction(auctionId);
   return await tx.wait();
 };
 
-export const getAuctionInfo = async (contractAddress, provider) => {
-  const contract = getAuctionContract(contractAddress, provider);
-  const [highestBid, highestBidder, ended, endTime, minIncrement, startPrice, seller] = 
-    await Promise.all([
-      contract.highestBid(),
-      contract.highestBidder(),
-      contract.ended(),
-      contract.endTime(),
-      contract.minimumIncrement(),
-      contract.startingPrice(),
-      contract.seller()
-    ]);
+// Lấy thông tin auction
+export const getAuctionInfo = async (provider, auctionId) => {
+  const contract = getMarketplaceContract(provider);
+  const auction = await contract.getAuction(auctionId);
   
   return {
-    highestBid: ethers.formatEther(highestBid),
-    highestBidder,
-    ended,
-    endTime: Number(endTime) * 1000,
-    minimumIncrement: ethers.formatEther(minIncrement),
-    startingPrice: ethers.formatEther(startPrice),
-    seller
+    auctionId: Number(auction.auctionId),
+    seller: auction.seller,
+    productId: auction.productId,
+    startingPrice: ethers.formatEther(auction.startingPrice),
+    minIncrement: ethers.formatEther(auction.minIncrement),
+    startTime: Number(auction.startTime) * 1000,
+    endTime: Number(auction.endTime) * 1000,
+    highestBidder: auction.highestBidder,
+    highestBid: ethers.formatEther(auction.highestBid),
+    status: AUCTION_STATUS[Number(auction.status)] || Number(auction.status)
   };
 };
 
-export const listenToEvents = (contractAddress, provider, callbacks) => {
-  const contract = getAuctionContract(contractAddress, provider);
+// Lấy số tiền đang chờ rút
+export const getPendingReturn = async (provider, address) => {
+  const contract = getMarketplaceContract(provider);
+  const amount = await contract.pendingReturnOf(address);
+  return ethers.formatEther(amount);
+};
+
+// Lắng nghe events
+export const listenToMarketplaceEvents = (provider, callbacks) => {
+  const contract = getMarketplaceContract(provider);
   
-  contract.on('BidPlaced', (bidder, amount, event) => {
+  contract.on('BidPlaced', (auctionId, bidder, amount, timestamp) => {
     callbacks.onBid?.({
+      auctionId: Number(auctionId),
       bidder,
       amount: ethers.formatEther(amount),
-      txHash: event.log.transactionHash,
-      blockNumber: event.log.blockNumber
+      timestamp: Number(timestamp) * 1000
     });
   });
 
-  contract.on('AuctionEnded', (winner, amount) => {
-    callbacks.onEnd?.({ winner, amount: ethers.formatEther(amount) });
+  contract.on('AuctionEnded', (auctionId, winner, amount) => {
+    callbacks.onEnd?.({
+      auctionId: Number(auctionId),
+      winner,
+      amount: ethers.formatEther(amount)
+    });
   });
 
-  return () => {
-    contract.removeAllListeners();
-  };
+  contract.on('AuctionExtended', (auctionId, newEndTime) => {
+    callbacks.onExtend?.({
+      auctionId: Number(auctionId),
+      newEndTime: Number(newEndTime) * 1000
+    });
+  });
+
+  return () => contract.removeAllListeners();
 };

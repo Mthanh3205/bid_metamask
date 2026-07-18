@@ -1,12 +1,13 @@
 const Category = require('../models/Category');
+const mongoose = require('mongoose');
 
-// [GET] Public: Lấy tất cả danh mục
-exports.getAllCategories = async (req, res) => {
+// [GET] Lấy danh sách categories
+exports.getCategories = async (req, res) => {
     try {
         const categories = await Category.find();
         res.status(200).json(categories);
     } catch (error) {
-        res.status(500).json({ message: 'Lỗi khi lấy danh mục!', error: error.message });
+        res.status(500).json({ message: 'Lỗi server!', error: error.message });
     }
 };
 
