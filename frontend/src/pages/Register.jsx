@@ -1,152 +1,211 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaUser, FaEnvelope, FaLock, FaPhone, FaMapMarkerAlt, FaWallet } from 'react-icons/fa';
+import { useAuth } from '../contexts/AuthContext';
+import { Loader2, Wallet, User, Mail, Lock, Phone, MapPin } from 'lucide-react';
 import { BrowserProvider } from 'ethers';
-import api from '../utils/api'; // Khai báo api call
 
-const Register = () => {
-  const navigate = useNavigate();
-  const [formData, setFormData] = useState({
+export default function Register() {
+  const [form, setForm] = useState({
     userName: '',
     email: '',
     password: '',
+    confirmPassword: '',
     phone: '',
     address: '',
     walletAddress: '',
-    role: 'Buyer', // Giá trị mặc định
+    role: 'Buyer'
   });
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { register } = useAuth();
+  const navigate = useNavigate();
 
-  const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const connectAndGetWallet = async () => {
-    if (!window.ethereum) {
-      alert('Vui lòng cài đặt ví MetaMask!');
-      return;
-    }
+  const connectWallet = async () => {
+    if (!window.ethereum) return alert('Vui lòng cài đặt MetaMask!');
     try {
       const provider = new BrowserProvider(window.ethereum);
       const accounts = await provider.send('eth_requestAccounts', []);
-      setFormData({
-        ...formData,
-        walletAddress: accounts[0],
-      });
-      alert('Đã liên kết địa chỉ ví thành công vào form!');
-    } catch (error) {
+      setForm(prev => ({ ...prev, walletAddress: accounts[0] }));
+    } catch (err) {
       alert('Không thể kết nối ví.');
     }
   };
 
-  const handleRegister = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
+    if (form.password !== form.confirmPassword) {
+      return setError('Mật khẩu xác nhận không khớp');
+    }
+
+    setLoading(true);
+    setError('');
 
     try {
-      // GỌI API ĐĂNG KÝ THỰC TẾ XUỐNG BACKEND
-      const response = await api.post('/auth/register', formData);
+      const { confirmPassword, ...dataToSubmit } = form;
+      
+      // ⚠️ FIX: Không gửi walletAddress nếu rỗng
+      if (!dataToSubmit.walletAddress || dataToSubmit.walletAddress.trim() === '') {
+        delete dataToSubmit.walletAddress;
+      }
 
-      alert(response.data.message || 'Đăng ký tài khoản thành công!');
-      navigate('/login'); // Đăng ký xong chuyển sang trang Đăng nhập
-    } catch (error) {
-      alert(error.response?.data?.message || 'Đăng ký thất bại. Email đã tồn tại hoặc thông tin không hợp lệ.');
+      await register(dataToSubmit);
+      navigate('/'); // Đăng ký thành công → vào trang chủ
+    } catch (err) {
+      console.error('Register error:', err);
+      const msg = err.response?.data?.message 
+        || err.response?.data?.error 
+        || 'Đăng ký thất bại';
+      setError(msg);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-      <div className="bg-white p-8 rounded-2xl shadow-md border border-gray-100 w-full max-w-lg">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Tạo tài khoản mới</h2>
-          <p className="text-gray-500">Tham gia sàn đấu giá phi tập trung an toàn, minh bạch</p>
-        </div>
+    <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="w-full max-w-lg glass rounded-2xl p-8 border border-slate-700/50">
+        <h2 className="text-2xl font-bold text-center mb-6 text-white">Tạo tài khoản mới</h2>
 
-        <form onSubmit={handleRegister} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Họ và tên</label>
+        {error && (
+          <p className="text-red-400 text-sm text-center mb-4 bg-red-500/10 p-3 rounded-lg">
+            {error}
+          </p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="relative">
+            <User className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Họ và tên"
+              required
+              className="input-field pl-10"
+              value={form.userName}
+              onChange={e => setForm(prev => ({ ...prev, userName: e.target.value }))}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><FaUser /></span>
-              <input type="text" name="userName" required value={formData.userName} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm" placeholder="Nguyễn Văn A" />
+              <Mail className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" />
+              <input
+                type="email"
+                placeholder="Email"
+                required
+                className="input-field pl-10"
+                value={form.email}
+                onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
+              />
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><FaEnvelope /></span>
-                <input type="email" name="email" required value={formData.email} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm" placeholder="name@example.com" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><FaPhone /></span>
-                <input type="text" name="phone" required value={formData.phone} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm" placeholder="0912345678" />
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><FaLock /></span>
-              <input type="password" name="password" required value={formData.password} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm" placeholder="••••••••" />
+              <Phone className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Số điện thoại"
+                className="input-field pl-10"
+                value={form.phone}
+                onChange={e => setForm(prev => ({ ...prev, phone: e.target.value }))}
+              />
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Địa chỉ giao hàng</label>
+          <div className="relative">
+            <MapPin className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Địa chỉ giao hàng"
+              className="input-field pl-10"
+              value={form.address}
+              onChange={e => setForm(prev => ({ ...prev, address: e.target.value }))}
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <div className="relative flex-grow">
+              <Wallet className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Địa chỉ ví MetaMask (tùy chọn)"
+                className="input-field pl-10 font-mono text-xs"
+                value={form.walletAddress}
+                onChange={e => setForm(prev => ({ ...prev, walletAddress: e.target.value }))}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={connectWallet}
+              className="bg-slate-700 hover:bg-slate-600 px-4 rounded-xl text-xs text-white whitespace-nowrap"
+            >
+              🔗 Kết nối
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><FaMapMarkerAlt /></span>
-              <input type="text" name="address" required value={formData.address} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm" placeholder="Số nhà, Tên đường..." />
+              <Lock className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" />
+              <input
+                type="password"
+                placeholder="Mật khẩu"
+                required
+                className="input-field pl-10"
+                value={form.password}
+                onChange={e => setForm(prev => ({ ...prev, password: e.target.value }))}
+              />
+            </div>
+            <div className="relative">
+              <Lock className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" />
+              <input
+                type="password"
+                placeholder="Xác nhận MK"
+                required
+                className="input-field pl-10"
+                value={form.confirmPassword}
+                onChange={e => setForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+              />
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Địa chỉ ví MetaMask</label>
-            <div className="flex gap-2">
-              <div className="relative flex-grow">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><FaWallet /></span>
-                <input type="text" name="walletAddress" value={formData.walletAddress} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm font-mono" placeholder="0x..." />
-              </div>
-              <button type="button" onClick={connectAndGetWallet} className="bg-gray-800 hover:bg-gray-900 text-white font-medium px-4 py-2 rounded-xl text-xs flex items-center gap-1 transition">
-                Lấy địa chỉ ví
-              </button>
-            </div>
+          <div className="flex gap-6 py-2">
+            <label className="flex items-center text-slate-300 text-sm cursor-pointer">
+              <input
+                type="radio"
+                name="role"
+                value="Buyer"
+                checked={form.role === 'Buyer'}
+                onChange={e => setForm(prev => ({ ...prev, role: e.target.value }))}
+                className="mr-2"
+              />
+              Người mua
+            </label>
+            <label className="flex items-center text-slate-300 text-sm cursor-pointer">
+              <input
+                type="radio"
+                name="role"
+                value="Seller"
+                checked={form.role === 'Seller'}
+                onChange={e => setForm(prev => ({ ...prev, role: e.target.value }))}
+                className="mr-2"
+              />
+              Người bán
+            </label>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Bạn muốn tham gia với vai trò?</label>
-            <div className="flex gap-6">
-              <label className="inline-flex items-center cursor-pointer">
-                <input type="radio" name="role" value="Buyer" checked={formData.role === 'Buyer'} onChange={handleInputChange} className="w-4 h-4 text-blue-600" />
-                <span className="ml-2 text-sm text-gray-700 font-medium">Người Mua (Buyer)</span>
-              </label>
-              <label className="inline-flex items-center cursor-pointer">
-                <input type="radio" name="role" value="Seller" checked={formData.role === 'Seller'} onChange={handleInputChange} className="w-4 h-4 text-blue-600" />
-                <span className="ml-2 text-sm text-gray-700 font-medium">Người Bán (Seller)</span>
-              </label>
-            </div>
-          </div>
-
-          <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow transition text-sm mt-4 disabled:bg-blue-400">
-            {isLoading ? 'Đang khởi tạo tài khoản...' : 'Đăng Ký Tài Khoản'}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full btn-primary flex items-center justify-center gap-2"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Đăng ký'}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-600 mt-6">
-          Đã có tài khoản? <Link to="/login" className="text-blue-600 hover:underline font-medium">Đăng nhập</Link>
+        <p className="text-center mt-4 text-slate-400 text-sm">
+          Đã có tài khoản?{' '}
+          <Link to="/login" className="text-purple-400 hover:underline">
+            Đăng nhập
+          </Link>
         </p>
       </div>
     </div>
   );
-};
-
-export default Register;
+}
