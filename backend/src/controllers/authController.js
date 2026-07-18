@@ -5,19 +5,6 @@ const jwt = require('jsonwebtoken');
 // [POST] Đăng ký tài khoản
 exports.register = async (req, res) => {
   try {
-    const { userName, email, password, walletAddress, phone, address, role } = req.body;
-
-    // 1. Kiểm tra email đã tồn tại chưa
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ message: 'Email này đã được sử dụng!' });
-    }
-
-    // 2. Mã hóa mật khẩu (Salt: 10 vòng)
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // 3. Tạo user mới
     let { userName, email, password, phone, address, walletAddress, role } = req.body;
 
     // ⚠️ FIX: Chuyển chuỗi rỗng thành null để tránh lỗi unique index
@@ -48,14 +35,6 @@ exports.register = async (req, res) => {
       userName,
       email,
       password: hashedPassword,
-      walletAddress,
-      phone,
-      address,
-      role, // Mặc định trong Model là 'Buyer' nếu không truyền lên
-    });
-
-    res.status(201).json({
-      message: 'Đăng ký tài khoản thành công!',
       phone: phone || '',
       address: address || '',
       walletAddress, // null nếu không nhập
@@ -75,9 +54,11 @@ exports.register = async (req, res) => {
         userName: user.userName,
         email: user.email,
         role: user.role,
+        walletAddress: user.walletAddress,
       },
     });
   } catch (error) {
+    console.error('Register error:', error);
     res.status(500).json({ message: 'Lỗi server khi đăng ký!', error: error.message });
   }
 };
