@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { FaBoxOpen, FaGavel, FaPlus, FaList, FaEdit, FaTrash, FaCheckCircle, FaClock } from 'react-icons/fa';
 
+import { BrowserProvider, Contract, parseEther } from 'ethers';
+import api from '../utils/api';
+
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../utils/constants';
+
 // Mock data: Danh sách sản phẩm của người bán
 const mockProducts = [
   { id: 'p1', title: 'Đồng hồ Hublot Classic Fusion', category: 'Trang sức & Đồng hồ', condition: 'Used', status: 'Approved', image: 'https://images.unsplash.com/photo-1523170335258-f5ed11844a49?q=80&w=200' },
@@ -31,9 +36,72 @@ const SellerDashboard = () => {
     setActiveTab('products');
   };
 
-  const handleCreateAuction = (productId) => {
-    // Logic gọi Smart Contract ethers.js ( createAuction() ) [cite: 98, 133]
-    alert(`Chuyển sang giao diện thiết lập giá và tạo Smart Contract cho sản phẩm ID: ${productId}`);
+  const handleCreateAuction = async (productId) => {
+    // 1. Kiểm tra ví MetaMask
+    if (!window.ethereum) {
+      return alert("Vui lòng cài đặt ví MetaMask để thực hiện chức năng này!");
+    }
+
+    try {
+      // 2. Nhập thông tin cấu hình phiên đấu giá
+      const startingPrice = prompt("Nhập giá khởi điểm (ETH):", "0.5");
+      if (!startingPrice) return; 
+      
+      const minIncrement = prompt("Nhập bước giá tối thiểu (ETH):", "0.05");
+      if (!minIncrement) return;
+      
+      const duration = prompt("Nhập thời gian đấu giá (tính bằng Phút):", "1440"); // Mặc định 1 ngày = 1440 phút
+      if (!duration) return;
+
+      // 3. Kết nối với MetaMask và Smart Contract
+      const provider = new BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      
+      // Sử dụng CONTRACT_ADDRESS và CONTRACT_ABI từ file constants.js
+      const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+      // 4. GỌI LÊN BLOCKCHAIN SEPOLIA
+      alert("Đang tạo giao dịch, vui lòng xác nhận trên ví MetaMask...");
+      
+      const tx = await contract.createAuction(
+        productId,
+        parseEther(startingPrice), // Hàm parseEther tự đổi "0.5" thành Wei (18 số 0)
+        parseEther(minIncrement), 
+        parseInt(duration)
+      );
+
+      // Đợi mạng lưới Sepolia xác nhận giao dịch (thường mất 15-30 giây)
+      alert("Đang chờ mạng Blockchain xác nhận... (Vui lòng không đóng trình duyệt)");
+      await tx.wait(); 
+
+      // 5. LƯU THÔNG TIN VÀO BACKEND (MONGODB) ĐỂ HIỂN THỊ LÊN WEB
+      const startTime = new Date();
+      const endTime = new Date(startTime.getTime() + parseInt(duration) * 60000);
+
+      await api.post('/auctions', {
+        productId,
+        contractAddress: CONTRACT_ADDRESS,
+        startingPrice: Number(startingPrice),
+        minimumIncrement: Number(minIncrement),
+        startTime: startTime,
+        endTime: endTime
+      });
+
+      alert("🎉 Đã tạo phiên đấu giá thành công và ghi nhận lên Blockchain!");
+      
+      // Chuyển tab sang mục Quản lý đấu giá để người bán xem thành quả
+      setActiveTab('auctions');
+      
+    } catch (error) {
+      console.error("Lỗi tạo đấu giá:", error);
+      
+      // Bắt lỗi khi người dùng từ chối ký trên MetaMask
+      if (error.code === 'ACTION_REJECTED') {
+        alert("Bạn đã hủy giao dịch trên MetaMask.");
+      } else {
+        alert("Tạo đấu giá thất bại! Vui lòng kiểm tra lại số dư Sepolia ETH hoặc log hệ thống.");
+      }
+    }
   };
 
   return (
