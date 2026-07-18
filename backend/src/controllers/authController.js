@@ -4,42 +4,65 @@ const jwt = require('jsonwebtoken');
 
 // [POST] Đăng ký tài khoản
 exports.register = async (req, res) => {
-    try {
-        const { userName, email, password, walletAddress, phone, address, role } = req.body;
+  try {
+    let { userName, email, password, phone, address, walletAddress, role } = req.body;
 
-        // 1. Kiểm tra email đã tồn tại chưa
-        const userExists = await User.findOne({ email });
-        if (userExists) {
-            return res.status(400).json({ message: 'Email này đã được sử dụng!' });
-        }
-
-        // 2. Mã hóa mật khẩu (Salt: 10 vòng)
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        // 3. Tạo user mới
-        const user = await User.create({
-            userName,
-            email,
-            password: hashedPassword,
-            walletAddress,
-            phone,
-            address,
-            role // Mặc định trong Model là 'Buyer' nếu không truyền lên
-        });
-
-        res.status(201).json({
-            message: 'Đăng ký tài khoản thành công!',
-            user: {
-                _id: user._id,
-                userName: user.userName,
-                email: user.email,
-                role: user.role
-            }
-        });
-    } catch (error) {
-        res.status(500).json({ message: 'Lỗi server khi đăng ký!', error: error.message });
+    // ⚠️ FIX: Chuyển chuỗi rỗng thành null để tránh lỗi unique index
+    if (!walletAddress || walletAddress.trim() === '') {
+      walletAddress = null;
     }
+
+    // Kiểm tra email đã tồn tại chưa
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: 'Email đã được sử dụng!' });
+    }
+
+    // Kiểm tra walletAddress đã tồn tại chưa (nếu có nhập)
+    if (walletAddress) {
+      const walletExists = await User.findOne({ walletAddress });
+      if (walletExists) {
+        return res.status(400).json({ message: 'Địa chỉ ví đã được sử dụng!' });
+      }
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Tạo user
+    const user = await User.create({
+      userName,
+      email,
+      password: hashedPassword,
+      phone: phone || '',
+      address: address || '',
+      walletAddress,  // null nếu không nhập
+      role: role || 'Buyer'
+    });
+
+    // Tạo token luôn để tự động đăng nhập sau khi đăng ký
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.status(201).json({
+      message: 'Đăng ký thành công!',
+      token,  // ← trả token để frontend tự động login
+      user: {
+        _id: user._id,
+        userName: user.userName,
+        email: user.email,
+        role: user.role,
+        walletAddress: user.walletAddress
+      }
+    });
+  } catch (error) {
+    console.error('Register error:', error);
+    res.status(500).json({ message: 'Lỗi server khi đăng ký!', error: error.message });
+  }
 };
 
 // [POST] Đăng nhập
