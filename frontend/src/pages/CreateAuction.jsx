@@ -55,7 +55,7 @@ export default function CreateAuction() {
       // BƯỚC 2: Tạo Auction trên Blockchain
       setStep(2);
       const now = new Date();
-      const safeStartTime = new Date(now.getTime() + 2 * 60 * 1000); // +2 phút buffer
+      const safeStartTime = now;
       const endTime = new Date(safeStartTime.getTime() + parseFloat(form.durationHours) * 3600 * 1000);
 
       const { auctionId, txHash } = await createAuctionOnChain(signer, {

@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 
 // Địa chỉ contract đã deploy trên Sepolia
-export const MARKETPLACE_ADDRESS = '0x2E9Ea2062A5E92057371e1A592385f30cF64D126';
+export const MARKETPLACE_ADDRESS = '0xa5bF480710626b6526c74Ca0f6f0fA4790CB3396';
 
 export const MARKETPLACE_ABI = [
   // View / Pure

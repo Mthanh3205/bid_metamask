@@ -1,6 +1,6 @@
 const Auction = require('../models/Auction');
 const Product = require('../models/Product');
-const Bid = require('../models/Bid'); // ← THÊM
+const Bid = require('../models/Bid'); 
 
 // [POST] Tạo đấu giá
 exports.createAuction = async (req, res) => {
@@ -14,12 +14,17 @@ exports.createAuction = async (req, res) => {
             return res.status(403).json({ message: 'Bạn không phải chủ sản phẩm này!' });
         }
 
-        // Kiểm tra scAuctionId đã tồn tại chưa
+        // Kiểm tra scAuctionId đã tồn tại chưu
         if (scAuctionId) {
             const exists = await Auction.findOne({ scAuctionId });
             if (exists) return res.status(400).json({ message: 'AuctionId đã tồn tại!' });
         }
 
+        const now = new Date();
+
+        const finalStartTime = startTime ? new Date(startTime) : now;
+        const isStartNow = finalStartTime <= now;
+        
         const auction = await Auction.create({
             productId,
             sellerId: req.user._id,
@@ -27,23 +32,25 @@ exports.createAuction = async (req, res) => {
             contractAddress,
             startingPrice,
             minimumIncrement,
-            startTime,
+            startTime: finalStartTime,
             endTime,
-            status: 'Upcoming'
+            status: isStartNow ? 'Active' : 'Upcoming', 
+            currentPrice: startingPrice
         });
 
-        // Cập nhật product thành Auctioning
         product.status = 'Auctioning';
         await product.save();
 
-        res.status(201).json({ message: 'Tạo phiên đấu giá thành công!', auction });
+        res.status(201).json({ 
+            message: isStartNow ? 'Phiên đấu giá đã bắt đầu!' : 'Tạo phiên đấu giá thành công!', 
+            auction 
+        });
     } catch (error) {
         console.error('Create auction error:', error);
         res.status(500).json({ message: 'Lỗi khi tạo phiên đấu giá!', error: error.message });
     }
 };
-
-// [GET] Lấy chi tiết 1 đấu giá ← THÊM HÀM NÀY
+// [GET] Lấy chi tiết 1 đấu giá 
 exports.getAuctionById = async (req, res) => {
     try {
         const auction = await Auction.findById(req.params.id)
@@ -124,6 +131,51 @@ exports.getAuctionBids = async (req, res) => {
             .populate('bidderId', 'userName')
             .sort({ createdAt: -1 });
         res.status(200).json(bids);
+    } catch (error) {
+        res.status(500).json({ message: 'Lỗi server!', error: error.message });
+    }
+};
+
+// [POST] Đặt giá mới 
+exports.placeBid = async (req, res) => {
+    try {
+        const { auctionId, bidAmount, txHash } = req.body;
+
+        const auction = await Auction.findById(auctionId);
+        if (!auction) {
+            return res.status(404).json({ message: 'Không tìm thấy phiên đấu giá!' });
+        }
+
+        // Tạo bid mới
+        const bid = await Bid.create({
+            auctionId,
+            bidderId: req.user._id,
+            bidAmount,
+            txHash
+        });
+
+        auction.currentPrice = bidAmount;
+        auction.winnerId = req.user._id;
+        await auction.save();
+
+        res.status(201).json({ message: 'Lưu đặt giá thành công!', bid });
+    } catch (error) {
+        console.error('Place bid error:', error);
+        res.status(500).json({ message: 'Lỗi khi lưu đặt giá!', error: error.message });
+    }
+};
+
+// [PUT] Cập nhật trạng thái auction
+exports.updateAuctionStatus = async (req, res) => {
+    try {
+        const { status } = req.body;
+        const auction = await Auction.findByIdAndUpdate(
+            req.params.id,
+            { status },
+            { new: true }
+        );
+        if (!auction) return res.status(404).json({ message: 'Không tìm thấy!' });
+        res.status(200).json(auction);
     } catch (error) {
         res.status(500).json({ message: 'Lỗi server!', error: error.message });
     }

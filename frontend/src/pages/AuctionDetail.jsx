@@ -2,16 +2,16 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useWeb3 } from '../contexts/Web3Context';
 import api from '../services/api';
-import { 
-  getAuctionInfo, placeBid, withdrawFunds, endAuction, 
-  getPendingReturn, listenToMarketplaceEvents, MARKETPLACE_ADDRESS 
+import {
+  getAuctionInfo, placeBid, withdrawFunds, endAuction,
+  getPendingReturn, listenToMarketplaceEvents, MARKETPLACE_ADDRESS
 } from '../services/contract';
 import CountdownTimer from '../components/CountdownTimer';
 
 export default function AuctionDetail() {
   const { id } = useParams();
   const { account, signer, provider } = useWeb3();
-  
+
   const [auction, setAuction] = useState(null);
   const [chainInfo, setChainInfo] = useState(null);
   const [bidAmount, setBidAmount] = useState('');
@@ -30,8 +30,8 @@ export default function AuctionDetail() {
     try {
       const { data } = await api.get(`/auctions/${id}`);
       setAuction(data);
-      
-      // ⚠️ FIX: Bọc try-catch để không crash nếu chưa có bids
+
+      // Bọc try-catch để không crash nếu chưa có bids
       try {
         const { data: bidData } = await api.get(`/auctions/${id}/bids`);
         setBids(bidData);
@@ -51,7 +51,7 @@ export default function AuctionDetail() {
     try {
       const info = await getAuctionInfo(provider, auction.scAuctionId);
       setChainInfo(info);
-      
+
       if (account) {
         const pending = await getPendingReturn(provider, account);
         setPendingReturn(pending);
@@ -64,7 +64,7 @@ export default function AuctionDetail() {
   useEffect(() => {
     refreshChainData();
     if (!provider || !auction?.scAuctionId) return;
-    
+
     const cleanup = listenToMarketplaceEvents(provider, {
       onBid: (data) => {
         if (data.auctionId === auction.scAuctionId) refreshChainData();
@@ -73,7 +73,7 @@ export default function AuctionDetail() {
         if (data.auctionId === auction.scAuctionId) refreshChainData();
       }
     });
-    
+
     return cleanup;
   }, [refreshChainData, provider, auction]);
 
@@ -81,7 +81,7 @@ export default function AuctionDetail() {
     e.preventDefault();
     if (!signer || !account) return alert('Kết nối MetaMask!');
 
-    // ⚠️ FIX: Dùng startingPrice nếu chưa có bid nào
+    // Dùng startingPrice nếu chưa có bid nào
     const minBid = chainInfo?.highestBid && parseFloat(chainInfo.highestBid) > 0
       ? parseFloat(chainInfo.highestBid) + parseFloat(chainInfo.minIncrement)
       : parseFloat(auction.startingPrice);
@@ -95,7 +95,7 @@ export default function AuctionDetail() {
 
     try {
       const receipt = await placeBid(signer, auction.scAuctionId, bidAmount);
-      
+
       await api.post('/auctions/bid', {
         auctionId: id,
         bidAmount: parseFloat(bidAmount),
@@ -129,29 +129,33 @@ export default function AuctionDetail() {
   const handleEndAuction = async () => {
     if (!signer) return;
     try {
-      await endAuction(signer, auction.scAuctionId);
-      setMessage({ type: 'success', text: 'Đã kết thúc phiên đấu giá!' });
-      refreshChainData();
+        await endAuction(signer, auction.scAuctionId);
+        
+        await api.put(`/auctions/${id}/status`, { status: 'Ended' });
+        
+        setMessage({ type: 'success', text: 'Đã kết thúc phiên đấu giá!' });
+        refreshChainData();
+        fetchAuctionDetail(); // Refresh để cập nhật status mới
     } catch (err) {
-      setMessage({ type: 'error', text: err.reason || 'Không thể kết thúc' });
+        setMessage({ type: 'error', text: err.reason || 'Không thể kết thúc' });
     }
-  };
+};
 
   if (loading) return <div className="text-center py-20">Đang tải...</div>;
   if (!auction) return <div className="text-center py-20">Không tìm thấy</div>;
 
-  // ⚠️ FIX: Hiển thị giá đúng
+  // Hiển thị giá đúng
   const currentPrice = chainInfo?.highestBid && parseFloat(chainInfo.highestBid) > 0
-    ? chainInfo.highestBid 
+    ? chainInfo.highestBid
     : auction.startingPrice;
-    
+
   const minNextBid = chainInfo?.highestBid && parseFloat(chainInfo.highestBid) > 0
     ? (parseFloat(chainInfo.highestBid) + parseFloat(chainInfo.minIncrement || auction.minimumIncrement)).toFixed(4)
     : auction.startingPrice;
 
-  // ⚠️ FIX: Cho phép đặt giá khi Upcoming hoặc Active (contract sẽ tự reject nếu chưa start)
+  // Cho phép đặt giá khi Upcoming hoặc Active (contract sẽ tự reject nếu chưa start)
   const canBid = auction.status === 'Upcoming' || auction.status === 'Active';
-  
+
   const isSeller = account && auction.sellerId?.walletAddress?.toLowerCase() === account.toLowerCase();
   const canEnd = isSeller && auction.status === 'Active';
 
@@ -178,7 +182,7 @@ export default function AuctionDetail() {
                     <div>
                       <p className="font-medium text-sm">{bid.bidderId?.userName || 'Unknown'}</p>
                       <a href={`https://sepolia.etherscan.io/tx/${bid.txHash}`} target="_blank" className="text-xs text-purple-400 hover:underline">
-                        {bid.txHash?.slice(0,10)}...
+                        {bid.txHash?.slice(0, 10)}...
                       </a>
                     </div>
                     <span className="font-bold text-purple-400">{bid.bidAmount} ETH</span>
@@ -203,7 +207,11 @@ export default function AuctionDetail() {
               {auction.endTime && (
                 <p className="text-sm text-slate-400 mt-1">
                   {auction.status === 'Active' ? 'Còn: ' : 'Bắt đầu sau: '}
-                  <CountdownTimer endTime={new Date(auction.endTime)} />
+                  <CountdownTimer
+                    endTime={new Date(
+                      auction.status === 'Active' ? auction.endTime : auction.startTime
+                    )}
+                  />
                 </p>
               )}
             </div>
@@ -217,7 +225,6 @@ export default function AuctionDetail() {
               </div>
             )}
 
-            {/* ⚠️ FIX: Hiển thị form cho cả Upcoming và Active */}
             {canBid && (
               <form onSubmit={handlePlaceBid} className="space-y-4">
                 {message && (
@@ -265,7 +272,7 @@ export default function AuctionDetail() {
               <div className="flex justify-between">
                 <span className="text-slate-400">Contract</span>
                 <a href={`https://sepolia.etherscan.io/address/${MARKETPLACE_ADDRESS}`} target="_blank" className="text-purple-400 font-mono hover:underline">
-                  {MARKETPLACE_ADDRESS.slice(0,6)}...
+                  {MARKETPLACE_ADDRESS.slice(0, 6)}...
                 </a>
               </div>
             </div>

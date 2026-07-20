@@ -173,10 +173,10 @@ contract AuctionMarketplace is IAuctionMarketplace, ReentrancyGuard {
 
     /// @inheritdoc IAuctionMarketplace
     function endAuction(uint256 auctionId)
-        external
-        override
-        nonReentrant
-        auctionExists(auctionId)
+    external
+    override
+    nonReentrant
+    auctionExists(auctionId)
     {
         AuctionStructs.Auction storage a = _auctions[auctionId];
 
@@ -184,7 +184,8 @@ contract AuctionMarketplace is IAuctionMarketplace, ReentrancyGuard {
             a.status == AuctionStructs.AuctionStatus.Ended ||
             a.status == AuctionStructs.AuctionStatus.Cancelled
         ) revert AuctionErrors.AuctionAlreadyFinalized();
-        if (block.timestamp < a.endTime) {
+
+        if (block.timestamp < a.endTime && msg.sender != a.seller) {
             revert AuctionErrors.AuctionNotYetEnded();
         }
 
