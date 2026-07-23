@@ -51,24 +51,43 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
-  // ⚠️ FIX: Bọc try-catch, không throw ra ngoài
+  // ===== UPDATE WALLET - ĐÃ SỬA =====
   const updateWallet = async (walletAddress) => {
     try {
-      if (!walletAddress) return { success: false, error: 'Không có địa chỉ ví' };
-      
+      if (!walletAddress) {
+        return { success: false, error: 'Không có địa chỉ ví' };
+      }
+
+      // Kiểm tra định dạng địa chỉ Ethereum
+      if (!walletAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
+        return { success: false, error: 'Địa chỉ ví không hợp lệ' };
+      }
+
       const { data } = await api.put('/auth/wallet', { walletAddress });
-      setUser(prev => ({ ...prev, walletAddress: data.walletAddress }));
+
+      // Cập nhật state user với walletAddress mới
+      setUser((prev) => (prev ? { ...prev, walletAddress: data.walletAddress } : null));
+
       return { success: true, walletAddress: data.walletAddress };
     } catch (err) {
-      const msg = err.response?.data?.message || 'Không thể cập nhật ví';
+      const msg = err.response?.data?.message || err.message || 'Không thể cập nhật ví';
       console.warn('Update wallet failed:', msg);
-      // Không throw → app không crash
       return { success: false, error: msg };
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, updateWallet, loading, isAuthenticated: !!user }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        register,
+        logout,
+        updateWallet,
+        loading,
+        isAuthenticated: !!user,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

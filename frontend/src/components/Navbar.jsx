@@ -5,7 +5,8 @@ import { Gavel, Wallet, LogOut, User } from 'lucide-react';
 
 export default function Navbar() {
   const { user, logout, isAuthenticated } = useAuth();
-  const { account, balance, connectWallet, disconnectWallet, isCorrectNetwork, switchNetwork } = useWeb3(); // ← THÊM switchNetwork
+  const { account, balance, connectWallet, disconnectWallet, isCorrectNetwork, switchNetwork } =
+    useWeb3();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -25,15 +26,22 @@ export default function Navbar() {
         </Link>
 
         <div className="flex items-center gap-4">
-          <Link to="/auctions" className="text-slate-300 hover:text-white transition-colors">Đấu giá</Link>
+          <Link to="/auctions" className="text-slate-300 hover:text-white transition-colors">
+            Đấu giá
+          </Link>
 
           {isAuthenticated && user?.role === 'Seller' && (
-            <Link to="/create" className="text-slate-300 hover:text-white transition-colors">Tạo đấu giá</Link>
+            <Link to="/create" className="text-slate-300 hover:text-white transition-colors">
+              Tạo đấu giá
+            </Link>
           )}
 
           {isAuthenticated ? (
             <>
-              <Link to="/profile" className="flex items-center gap-2 text-slate-300 hover:text-white">
+              <Link
+                to="/profile"
+                className="flex items-center gap-2 text-slate-300 hover:text-white"
+              >
                 <User className="w-4 h-4" />
                 <span className="hidden sm:inline">{user?.userName}</span>
               </Link>
@@ -44,7 +52,19 @@ export default function Navbar() {
                   <span className="text-sm font-mono text-slate-300">
                     {account.slice(0, 6)}...{account.slice(-4)}
                   </span>
-                  <span className="text-xs text-purple-400">{parseFloat(balance).toFixed(4)} ETH</span>
+                  <span className="text-xs text-purple-400">
+                    {parseFloat(balance).toFixed(4)} ETH
+                  </span>
+
+                  {/* Nút bấm để mở lại popup chọn tài khoản MetaMask khác */}
+                  <button
+                    onClick={() => connectWallet(true)}
+                    title="Đổi tài khoản MetaMask"
+                    className="text-xs text-slate-400 hover:text-purple-300 underline ml-1"
+                  >
+                    Đổi ví
+                  </button>
+
                   {!isCorrectNetwork && (
                     <button
                       onClick={switchNetwork}
@@ -55,20 +75,36 @@ export default function Navbar() {
                   )}
                 </div>
               ) : (
-                <button onClick={connectWallet} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 transition-all">
+                <button
+                  onClick={() => connectWallet(true)} // Gọi forceSelect = true khi kết nối
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 transition-all border border-purple-500/30"
+                >
                   <Wallet className="w-4 h-4" />
-                  Kết nối ví
+                  <span className="text-sm">Kết nối ví</span>
                 </button>
               )}
 
-              <button onClick={handleLogout} className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-red-400 transition-all">
+              <button
+                onClick={handleLogout}
+                className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-red-400 transition-all"
+              >
                 <LogOut className="w-4 h-4" />
               </button>
             </>
           ) : (
             <div className="flex items-center gap-2">
-              <Link to="/login" className="px-4 py-2 rounded-lg text-slate-300 hover:text-white transition-colors">Đăng nhập</Link>
-              <Link to="/register" className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-500 transition-colors">Đăng ký</Link>
+              <Link
+                to="/login"
+                className="px-4 py-2 rounded-lg text-slate-300 hover:text-white transition-colors"
+              >
+                Đăng nhập
+              </Link>
+              <Link
+                to="/register"
+                className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-500 transition-colors"
+              >
+                Đăng ký
+              </Link>
             </div>
           )}
         </div>

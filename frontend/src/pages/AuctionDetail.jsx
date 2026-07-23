@@ -1,10 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useWeb3 } from '../contexts/Web3Context';
+import { ethers } from 'ethers';
 import api from '../services/api';
 import {
-  getAuctionInfo, placeBid, withdrawFunds, endAuction,
-  getPendingReturn, listenToMarketplaceEvents, MARKETPLACE_ADDRESS
+  getAuctionInfo,
+  placeBid,
+  withdrawFunds,
+  endAuction,
+  getPendingReturn,
+  listenToMarketplaceEvents,
+  MARKETPLACE_ADDRESS,
 } from '../services/contract';
 import CountdownTimer from '../components/CountdownTimer';
 
@@ -71,7 +77,7 @@ export default function AuctionDetail() {
       },
       onEnd: (data) => {
         if (data.auctionId === auction.scAuctionId) refreshChainData();
-      }
+      },
     });
 
     return cleanup;
@@ -81,12 +87,32 @@ export default function AuctionDetail() {
     e.preventDefault();
     if (!signer || !account) return alert('Kết nối MetaMask!');
 
-    // Dùng startingPrice nếu chưa có bid nào
-    const minBid = chainInfo?.highestBid && parseFloat(chainInfo.highestBid) > 0
-      ? parseFloat(chainInfo.highestBid) + parseFloat(chainInfo.minIncrement)
-      : parseFloat(auction.startingPrice);
+    // ===== KIỂM TRA THỜI GIAN =====
+    const now = new Date();
+    const startTime = new Date(auction.startTime);
+    const endTime = new Date(auction.endTime);
 
-    if (parseFloat(bidAmount) < minBid) {
+    if (now < startTime) {
+      return setMessage({
+        type: 'error',
+        text: `⏳ Chưa bắt đầu! Bắt đầu lúc: ${startTime.toLocaleString('vi-VN')}`,
+      });
+    }
+    if (now > endTime) {
+      return setMessage({ type: 'error', text: '⏰ Phiên đấu giá đã kết thúc!' });
+    }
+
+    // ===== KIỂM TRA GIÁ =====
+    const highestBid = chainInfo?.highestBid ? parseFloat(chainInfo.highestBid) : 0;
+
+    const minIncrement = chainInfo?.minIncrement
+      ? parseFloat(chainInfo.minIncrement)
+      : parseFloat(auction.minimumIncrement || 0);
+
+    const startingPrice = parseFloat(auction.startingPrice);
+    const minBid = highestBid > 0 ? highestBid + minIncrement : startingPrice;
+
+    if (parseFloat(bidAmount) < minBid - 0.0001) {
       return setMessage({ type: 'error', text: `Giá đặt phải >= ${minBid.toFixed(4)} ETH` });
     }
 
@@ -94,12 +120,19 @@ export default function AuctionDetail() {
     setMessage(null);
 
     try {
+      // Debug log
+      console.log('Placing bid:', {
+        auctionId: auction.scAuctionId,
+        bidAmount: bidAmount,
+        valueInWei: ethers.parseEther(bidAmount).toString(),
+      });
+
       const receipt = await placeBid(signer, auction.scAuctionId, bidAmount);
 
       await api.post('/auctions/bid', {
         auctionId: id,
         bidAmount: parseFloat(bidAmount),
-        txHash: receipt.hash
+        txHash: receipt.hash,
       });
 
       setMessage({ type: 'success', text: 'Đặt giá thành công! 🎉' });
@@ -107,9 +140,29 @@ export default function AuctionDetail() {
       refreshChainData();
       fetchAuctionDetail();
     } catch (err) {
-      console.error(err);
-      const reason = err.reason || err.shortMessage || err.message || 'Đặt giá thất bại';
-      setMessage({ type: 'error', text: reason });
+      console.error('Bid error:', err);
+
+      // Parse lỗi chi tiết hơn
+      let errorMsg = 'Đặt giá thất bại';
+
+      if (err.code === 'CALL_EXCEPTION') {
+        if (err.reason) {
+          errorMsg = err.reason;
+        } else if (err.data) {
+          errorMsg = 'Transaction bị từ chối bởi contract';
+        } else {
+          errorMsg =
+            'Có thể: (1) Chưa đến giờ đấu giá, (2) Giá không đủ, (3) Auction không tồn tại';
+        }
+      } else if (err.code === 'ACTION_REJECTED') {
+        errorMsg = 'Bạn đã từ chối transaction';
+      } else if (err.code === 'INSUFFICIENT_FUNDS') {
+        errorMsg = 'Không đủ ETH trong ví';
+      } else {
+        errorMsg = err.reason || err.shortMessage || err.message || 'Lỗi không xác định';
+      }
+
+      setMessage({ type: 'error', text: errorMsg });
     } finally {
       setBidding(false);
     }
@@ -129,34 +182,40 @@ export default function AuctionDetail() {
   const handleEndAuction = async () => {
     if (!signer) return;
     try {
-        await endAuction(signer, auction.scAuctionId);
-        
-        await api.put(`/auctions/${id}/status`, { status: 'Ended' });
-        
-        setMessage({ type: 'success', text: 'Đã kết thúc phiên đấu giá!' });
-        refreshChainData();
-        fetchAuctionDetail(); // Refresh để cập nhật status mới
+      await endAuction(signer, auction.scAuctionId);
+
+      await api.put(`/auctions/${id}/status`, { status: 'Ended' });
+
+      setMessage({ type: 'success', text: 'Đã kết thúc phiên đấu giá!' });
+      refreshChainData();
+      fetchAuctionDetail(); // Refresh để cập nhật status mới
     } catch (err) {
-        setMessage({ type: 'error', text: err.reason || 'Không thể kết thúc' });
+      setMessage({ type: 'error', text: err.reason || 'Không thể kết thúc' });
     }
-};
+  };
 
   if (loading) return <div className="text-center py-20">Đang tải...</div>;
   if (!auction) return <div className="text-center py-20">Không tìm thấy</div>;
 
   // Hiển thị giá đúng
-  const currentPrice = chainInfo?.highestBid && parseFloat(chainInfo.highestBid) > 0
-    ? chainInfo.highestBid
-    : auction.startingPrice;
+  const currentPrice =
+    chainInfo?.highestBid && parseFloat(chainInfo.highestBid) > 0
+      ? chainInfo.highestBid
+      : auction.startingPrice;
 
-  const minNextBid = chainInfo?.highestBid && parseFloat(chainInfo.highestBid) > 0
-    ? (parseFloat(chainInfo.highestBid) + parseFloat(chainInfo.minIncrement || auction.minimumIncrement)).toFixed(4)
-    : auction.startingPrice;
+  const minNextBid =
+    chainInfo?.highestBid && parseFloat(chainInfo.highestBid) > 0
+      ? (
+          parseFloat(chainInfo.highestBid) +
+          parseFloat(chainInfo.minIncrement || auction.minimumIncrement)
+        ).toFixed(4)
+      : auction.startingPrice;
 
   // Cho phép đặt giá khi Upcoming hoặc Active (contract sẽ tự reject nếu chưa start)
   const canBid = auction.status === 'Upcoming' || auction.status === 'Active';
 
-  const isSeller = account && auction.sellerId?.walletAddress?.toLowerCase() === account.toLowerCase();
+  const isSeller =
+    account && auction.sellerId?.walletAddress?.toLowerCase() === account.toLowerCase();
   const canEnd = isSeller && auction.status === 'Active';
 
   return (
@@ -167,7 +226,9 @@ export default function AuctionDetail() {
           <div className="glass rounded-2xl p-6">
             <h1 className="text-3xl font-bold mb-2">{auction.productId?.productName}</h1>
             <p className="text-slate-400">Người bán: {auction.sellerId?.userName}</p>
-            <div className="aspect-video rounded-xl bg-slate-800/50 flex items-center justify-center text-6xl my-4">🎨</div>
+            <div className="aspect-video rounded-xl bg-slate-800/50 flex items-center justify-center text-6xl my-4">
+              🎨
+            </div>
             <p className="text-slate-400">{auction.productId?.description}</p>
           </div>
 
@@ -178,10 +239,17 @@ export default function AuctionDetail() {
                 <p className="text-slate-500 text-center py-4">Chưa có lượt đặt giá nào</p>
               ) : (
                 bids.map((bid, i) => (
-                  <div key={i} className="p-3 rounded-xl bg-slate-900/50 flex justify-between items-center">
+                  <div
+                    key={i}
+                    className="p-3 rounded-xl bg-slate-900/50 flex justify-between items-center"
+                  >
                     <div>
                       <p className="font-medium text-sm">{bid.bidderId?.userName || 'Unknown'}</p>
-                      <a href={`https://sepolia.etherscan.io/tx/${bid.txHash}`} target="_blank" className="text-xs text-purple-400 hover:underline">
+                      <a
+                        href={`https://sepolia.etherscan.io/tx/${bid.txHash}`}
+                        target="_blank"
+                        className="text-xs text-purple-400 hover:underline"
+                      >
                         {bid.txHash?.slice(0, 10)}...
                       </a>
                     </div>
@@ -200,7 +268,10 @@ export default function AuctionDetail() {
               <p className="text-sm text-slate-400">Giá hiện tại</p>
               <p className="text-4xl font-bold text-purple-400">{currentPrice} ETH</p>
               <p className="text-sm text-slate-400 mt-2">
-                Trạng thái: <span className={auction.status === 'Active' ? 'text-green-400' : 'text-yellow-400'}>
+                Trạng thái:{' '}
+                <span
+                  className={auction.status === 'Active' ? 'text-green-400' : 'text-yellow-400'}
+                >
                   {auction.status}
                 </span>
               </p>
@@ -208,9 +279,9 @@ export default function AuctionDetail() {
                 <p className="text-sm text-slate-400 mt-1">
                   {auction.status === 'Active' ? 'Còn: ' : 'Bắt đầu sau: '}
                   <CountdownTimer
-                    endTime={new Date(
-                      auction.status === 'Active' ? auction.endTime : auction.startTime
-                    )}
+                    endTime={
+                      new Date(auction.status === 'Active' ? auction.endTime : auction.startTime)
+                    }
                   />
                 </p>
               )}
@@ -218,8 +289,13 @@ export default function AuctionDetail() {
 
             {parseFloat(pendingReturn) > 0 && (
               <div className="mb-4 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/30">
-                <p className="text-sm text-yellow-400">Bạn có {parseFloat(pendingReturn).toFixed(4)} ETH đang chờ rút</p>
-                <button onClick={handleWithdraw} className="mt-2 w-full py-2 rounded-lg bg-yellow-600/20 text-yellow-300 hover:bg-yellow-600/30 text-sm">
+                <p className="text-sm text-yellow-400">
+                  Bạn có {parseFloat(pendingReturn).toFixed(4)} ETH đang chờ rút
+                </p>
+                <button
+                  onClick={handleWithdraw}
+                  className="mt-2 w-full py-2 rounded-lg bg-yellow-600/20 text-yellow-300 hover:bg-yellow-600/30 text-sm"
+                >
                   💸 Rút tiền về ví
                 </button>
               </div>
@@ -228,7 +304,9 @@ export default function AuctionDetail() {
             {canBid && (
               <form onSubmit={handlePlaceBid} className="space-y-4">
                 {message && (
-                  <div className={`p-3 rounded-xl text-sm ${message.type === 'success' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                  <div
+                    className={`p-3 rounded-xl text-sm ${message.type === 'success' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}
+                  >
                     {message.text}
                   </div>
                 )}
@@ -236,8 +314,14 @@ export default function AuctionDetail() {
                   <label className="block text-sm text-slate-400 mb-1">
                     Giá đặt (tối thiểu {minNextBid} ETH)
                   </label>
-                  <input type="number" step="0.001" required className="input-field"
-                    value={bidAmount} onChange={e => setBidAmount(e.target.value)} />
+                  <input
+                    type="number"
+                    step="0.001"
+                    required
+                    className="input-field"
+                    value={bidAmount}
+                    onChange={(e) => setBidAmount(e.target.value)}
+                  />
                 </div>
                 <button type="submit" disabled={bidding} className="w-full btn-primary">
                   {bidding ? 'Đang xử lý...' : '💰 Đặt giá'}
@@ -251,7 +335,10 @@ export default function AuctionDetail() {
             )}
 
             {canEnd && (
-              <button onClick={handleEndAuction} className="w-full mt-4 py-3 rounded-xl bg-red-600/20 text-red-400 hover:bg-red-600/30">
+              <button
+                onClick={handleEndAuction}
+                className="w-full mt-4 py-3 rounded-xl bg-red-600/20 text-red-400 hover:bg-red-600/30"
+              >
                 🔒 Kết thúc đấu giá & Chuyển tiền
               </button>
             )}
@@ -259,7 +346,9 @@ export default function AuctionDetail() {
             <div className="mt-6 pt-4 border-t border-slate-700/50 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-slate-400">Auction ID</span>
-                <span className="font-mono">#{auction.scAuctionId !== undefined ? auction.scAuctionId : '?'}</span>
+                <span className="font-mono">
+                  #{auction.scAuctionId !== undefined ? auction.scAuctionId : '?'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Giá khởi điểm</span>
@@ -271,7 +360,11 @@ export default function AuctionDetail() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Contract</span>
-                <a href={`https://sepolia.etherscan.io/address/${MARKETPLACE_ADDRESS}`} target="_blank" className="text-purple-400 font-mono hover:underline">
+                <a
+                  href={`https://sepolia.etherscan.io/address/${MARKETPLACE_ADDRESS}`}
+                  target="_blank"
+                  className="text-purple-400 font-mono hover:underline"
+                >
                   {MARKETPLACE_ADDRESS.slice(0, 6)}...
                 </a>
               </div>

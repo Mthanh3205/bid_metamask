@@ -5,26 +5,26 @@ export const MARKETPLACE_ADDRESS = '0xa5bF480710626b6526c74Ca0f6f0fA4790CB3396';
 
 export const MARKETPLACE_ABI = [
   // View / Pure
-  "function admin() view returns (address)",
-  "function getAuction(uint256 auctionId) view returns (tuple(uint256 auctionId, address seller, string productId, uint256 startingPrice, uint256 minIncrement, uint256 startTime, uint256 endTime, address highestBidder, uint256 highestBid, uint8 status))",
-  "function getHighestBid(uint256 auctionId) view returns (uint256)",
-  "function getWinner(uint256 auctionId) view returns (address)",
-  "function pendingReturnOf(address bidder) view returns (uint256)",
+  'function admin() view returns (address)',
+  'function getAuction(uint256 auctionId) view returns (tuple(uint256 auctionId, address seller, string productId, uint256 startingPrice, uint256 minIncrement, uint256 startTime, uint256 endTime, address highestBidder, uint256 highestBid, uint8 status))',
+  'function getHighestBid(uint256 auctionId) view returns (uint256)',
+  'function getWinner(uint256 auctionId) view returns (address)',
+  'function pendingReturnOf(address bidder) view returns (uint256)',
 
   // Write
-  "function createAuction(string productId, uint256 startingPrice, uint256 minIncrement, uint256 startTime, uint256 endTime) returns (uint256 auctionId)",
-  "function bid(uint256 auctionId) payable",
-  "function withdraw()",
-  "function endAuction(uint256 auctionId)",
-  "function cancelAuction(uint256 auctionId)",
+  'function createAuction(string productId, uint256 startingPrice, uint256 minIncrement, uint256 startTime, uint256 endTime) returns (uint256 auctionId)',
+  'function bid(uint256 auctionId) payable',
+  'function withdraw()',
+  'function endAuction(uint256 auctionId)',
+  'function cancelAuction(uint256 auctionId)',
 
   // Events
-  "event AuctionCreated(uint256 indexed auctionId, address indexed seller, string productId, uint256 startingPrice, uint256 minIncrement, uint256 startTime, uint256 endTime)",
-  "event BidPlaced(uint256 indexed auctionId, address indexed bidder, uint256 amount, uint256 timestamp)",
-  "event AuctionEnded(uint256 indexed auctionId, address indexed winner, uint256 amount)",
-  "event AuctionCancelled(uint256 indexed auctionId, address indexed seller)",
-  "event AuctionExtended(uint256 indexed auctionId, uint256 newEndTime)",
-  "event Withdrawn(address indexed bidder, uint256 amount)",
+  'event AuctionCreated(uint256 indexed auctionId, address indexed seller, string productId, uint256 startingPrice, uint256 minIncrement, uint256 startTime, uint256 endTime)',
+  'event BidPlaced(uint256 indexed auctionId, address indexed bidder, uint256 amount, uint256 timestamp)',
+  'event AuctionEnded(uint256 indexed auctionId, address indexed winner, uint256 amount)',
+  'event AuctionCancelled(uint256 indexed auctionId, address indexed seller)',
+  'event AuctionExtended(uint256 indexed auctionId, uint256 newEndTime)',
+  'event Withdrawn(address indexed bidder, uint256 amount)',
 ];
 
 // Status enum
@@ -32,7 +32,7 @@ export const AUCTION_STATUS = {
   0: 'Upcoming',
   1: 'Active',
   2: 'Ended',
-  3: 'Cancelled'
+  3: 'Cancelled',
 };
 
 // Helper
@@ -40,16 +40,25 @@ export const getMarketplaceContract = (signerOrProvider) => {
   return new ethers.Contract(MARKETPLACE_ADDRESS, MARKETPLACE_ABI, signerOrProvider);
 };
 
-// ⚠️ FIX: Dùng Contract instance thay vì ContractFactory
-export const createAuctionOnChain = async (signer, { productId, startingPrice, minIncrement, startTime, endTime }) => {
+// Dùng Contract instance thay vì ContractFactory
+export const createAuctionOnChain = async (
+  signer,
+  { productId, startingPrice, minIncrement, startTime, endTime }
+) => {
   const contract = getMarketplaceContract(signer);
-  
+
   const startTimeSec = Math.floor(new Date(startTime).getTime() / 1000);
   const endTimeSec = Math.floor(new Date(endTime).getTime() / 1000);
   const nowSec = Math.floor(Date.now() / 1000);
   const safeStartTime = Math.max(startTimeSec, nowSec + 60);
 
-  console.log('Calling createAuction with:', { productId, startingPrice, minIncrement, safeStartTime, endTimeSec });
+  console.log('Calling createAuction with:', {
+    productId,
+    startingPrice,
+    minIncrement,
+    safeStartTime,
+    endTimeSec,
+  });
 
   const tx = await contract.createAuction(
     productId,
@@ -58,9 +67,9 @@ export const createAuctionOnChain = async (signer, { productId, startingPrice, m
     safeStartTime,
     endTimeSec
   );
-  
+
   const receipt = await tx.wait();
-  console.log('Receipt logs:', receipt.logs);  
+  console.log('Receipt logs:', receipt.logs);
 
   // Parse event từ receipt
   let auctionId = null;
@@ -88,7 +97,7 @@ export const createAuctionOnChain = async (signer, { productId, startingPrice, m
 export const placeBid = async (signer, auctionId, amountEth) => {
   const contract = getMarketplaceContract(signer);
   const tx = await contract.bid(auctionId, {
-    value: ethers.parseEther(amountEth.toString())
+    value: ethers.parseEther(amountEth.toString()),
   });
   return await tx.wait();
 };
@@ -111,7 +120,7 @@ export const endAuction = async (signer, auctionId) => {
 export const getAuctionInfo = async (provider, auctionId) => {
   const contract = getMarketplaceContract(provider);
   const auction = await contract.getAuction(auctionId);
-  
+
   return {
     auctionId: Number(auction.auctionId),
     seller: auction.seller,
@@ -122,7 +131,7 @@ export const getAuctionInfo = async (provider, auctionId) => {
     endTime: Number(auction.endTime) * 1000,
     highestBidder: auction.highestBidder,
     highestBid: ethers.formatEther(auction.highestBid),
-    status: AUCTION_STATUS[Number(auction.status)] || Number(auction.status)
+    status: AUCTION_STATUS[Number(auction.status)] || Number(auction.status),
   };
 };
 
@@ -136,13 +145,13 @@ export const getPendingReturn = async (provider, address) => {
 // Lắng nghe events
 export const listenToMarketplaceEvents = (provider, callbacks) => {
   const contract = getMarketplaceContract(provider);
-  
+
   contract.on('BidPlaced', (auctionId, bidder, amount, timestamp) => {
     callbacks.onBid?.({
       auctionId: Number(auctionId),
       bidder,
       amount: ethers.formatEther(amount),
-      timestamp: Number(timestamp) * 1000
+      timestamp: Number(timestamp) * 1000,
     });
   });
 
@@ -150,14 +159,14 @@ export const listenToMarketplaceEvents = (provider, callbacks) => {
     callbacks.onEnd?.({
       auctionId: Number(auctionId),
       winner,
-      amount: ethers.formatEther(amount)
+      amount: ethers.formatEther(amount),
     });
   });
 
   contract.on('AuctionExtended', (auctionId, newEndTime) => {
     callbacks.onExtend?.({
       auctionId: Number(auctionId),
-      newEndTime: Number(newEndTime) * 1000
+      newEndTime: Number(newEndTime) * 1000,
     });
   });
 
